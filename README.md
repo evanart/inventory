@@ -26,15 +26,31 @@ Runs at `http://localhost:8787`
 
 ### Environment Variables
 
-Create a `.env` file in the project root:
-```
-VITE_API_PROXY_URL=http://localhost:8787
+Copy `.env.example` to `.env` and update values:
+```bash
+cp .env.example .env
 ```
 
-Or set when running:
-```bash
-VITE_API_PROXY_URL=http://localhost:8787 npm run dev
+**Required variables:**
 ```
+# Frontend URL of Cloudflare Worker
+VITE_API_PROXY_URL=http://localhost:8787
+
+# API key for authentication (must match worker API_KEY)
+VITE_API_KEY=dev-key-12345
+```
+
+**For worker (terminal 2):**
+```bash
+API_KEY=dev-key-12345 npx wrangler dev
+```
+
+**For frontend (terminal 1):**
+```bash
+npm run dev
+```
+
+⚠️ **Important:** Keep `VITE_API_KEY` and `API_KEY` synchronized between frontend and worker!
 
 ## 📖 Project Overview
 
@@ -195,56 +211,90 @@ inventory/
    ```
    Copy the namespace ID into `wrangler.jsonc`
 
-4. **Deploy worker:**
+4. **Generate a strong API key:**
    ```bash
-   wrangler deploy
+   openssl rand -base64 32
+   # Output example: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0==
    ```
 
-5. **Deploy frontend to any static host** (Vercel, Netlify, GitHub Pages):
+5. **Set API_KEY secret in production:**
    ```bash
+   wrangler secret put API_KEY --env production
+   # Paste the generated key when prompted
+   ```
+
+6. **Deploy worker:**
+   ```bash
+   wrangler deploy --env production
+   ```
+
+7. **Deploy frontend to any static host** (Vercel, Netlify, GitHub Pages):
+   ```bash
+   # Create .env.production with:
+   VITE_API_PROXY_URL=https://your-worker-url.workers.dev
+   VITE_API_KEY=<same key from step 4>
+
    npm run build
    # Upload dist/ folder
    ```
 
-6. **Update frontend env** to point to deployed worker URL
+8. **Update frontend env** to point to deployed worker URL
+
+### Rotating API Keys
+
+To change your API key in production:
+```bash
+wrangler secret put API_KEY --env production
+# Enter the new key when prompted
+```
+
+Then update frontend `.env.production` and redeploy frontend.
 
 ## 🔐 Security & Known Issues
 
-### ⚠️ Current Security Concerns
+### ✅ Security Features Implemented
 
-1. **No Authentication** - Anyone with the worker URL can read/write all data
-   - Solution: Implement API key or JWT auth (see Upcoming Features)
+1. **API Key Authentication** ✓ - All endpoints require valid Bearer token
+   - Implementation: `Authorization: Bearer <API_KEY>` header on all requests
+   - Keys stored as Cloudflare Worker secrets (not in code)
+   - Easy key rotation without code redeployment
+   - Setup: See [Deployment](#-deployment) section
 
-2. **CORS Too Permissive** - Defaults to allow all origins (`*`)
+### ⚠️ Remaining Security Concerns
+
+1. **CORS Still Permissive** - Defaults to allow all origins (`*`)
+   - Mitigation: API key requirement prevents unauthenticated access
    - Workaround: Set `ALLOWED_ORIGIN` in wrangler environment
 
-3. **No Rate Limiting** - AI calls are unmetered
+2. **No Rate Limiting** - AI calls are unmetered
    - Risk: Cost abuse, DoS attacks
-   - Planned: Add rate limiting by IP/API key
+   - Planned: Add rate limiting by API key
 
-4. **Data Sync Conflicts** - Multiple browser tabs can overwrite each other
-   - Workaround: Avoid editing same inventory in multiple tabs
+3. **Data Sync Conflicts** - Multiple browser tabs can overwrite each other
+   - Workaround: Avoid editing same inventory in multiple tabs simultaneously
    - Planned: Implement conflict resolution with last-write-wins or collaborative editing
 
-5. **Prompt Injection** - User input sent directly to AI system prompt
-   - Mitigation: AI runs locally on Cloudflare, but still risky
-   - Planned: Input validation and escaping
+4. **Prompt Injection** - User input sent to AI system prompt
+   - Mitigation: AI runs on Cloudflare infrastructure, limited risk
+   - Planned: Additional input validation and escaping
 
 ### Best Practices
 
-- **Never share the worker URL** publicly until authentication is added
+- **Keep API_KEY secret** - Never commit to git or share publicly
+- **Rotate keys regularly** - Use `wrangler secret put API_KEY --env production`
 - **Back up your inventory** regularly using Export feature (when available)
 - **Review AI output** - check that parsed items are correct before storing
 - **Test in development first** - use localhost before connecting to production
+- **Generate strong keys** - Use `openssl rand -base64 32` for production keys
 
 ## 📝 Upcoming Features
 
 ### High Priority (Security & Data Quality)
 
-- [ ] **Authentication & Authorization**
-  - Add API key validation to worker endpoints
-  - Support JWT tokens for multi-user scenarios
-  - Environment: Set `ALLOWED_API_KEYS` in wrangler.toml
+- [x] **Authentication & Authorization** ✓
+  - API key validation on all worker endpoints
+  - Bearer token support
+  - Future: JWT tokens for multi-user scenarios
 
 - [ ] **Data Export/Import**
   - Export inventory as JSON or CSV for backup/sharing

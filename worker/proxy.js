@@ -54,6 +54,10 @@ export default {
       return new Response("Forbidden", { status: 403 });
     }
 
+    if (!validateAuth(request, env)) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
+    }
+
     const url = new URL(request.url);
 
     // --- KV data endpoints ---
@@ -126,7 +130,20 @@ function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin || "*",
     "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Max-Age": "86400",
   };
+}
+
+function validateAuth(request, env) {
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return false;
+  }
+  const token = authHeader.slice(7);
+  const expectedKey = env.API_KEY;
+  if (!expectedKey || token !== expectedKey) {
+    return false;
+  }
+  return true;
 }
