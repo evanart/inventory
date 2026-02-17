@@ -1,3 +1,33 @@
+const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+
+const PARSE_SCHEMA = {
+  type: "object",
+  properties: {
+    action: { type: "string", enum: ["store", "remove"] },
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          quantity: { type: ["number", "null"] },
+          path: { type: "array", items: { type: "string" } },
+          category: {
+            type: "string",
+            enum: [
+              "tools", "cleaning", "electronics", "holiday", "clothing",
+              "kitchen", "bathroom", "office", "sports", "crafts",
+              "baby", "storage", "misc",
+            ],
+          },
+        },
+        required: ["name", "quantity", "path", "category"],
+      },
+    },
+  },
+  required: ["action", "items"],
+};
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
@@ -12,36 +42,27 @@ export default {
       return new Response("Forbidden", { status: 403 });
     }
     try {
-      const { system, message } = await request.json();
+      const { system, message, mode } = await request.json();
       if (!system || !message) {
         return new Response(
           JSON.stringify({ error: "Missing 'system' or 'message' field" }),
           { status: 400, headers: { ...corsHeaders(allowed), "Content-Type": "application/json" } }
         );
       }
-      const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": env.ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          system,
-          messages: [{ role: "user", content: message }],
-        }),
-      });
-      if (!anthropicRes.ok) {
-        const errBody = await anthropicRes.text();
-        return new Response(
-          JSON.stringify({ error: "Anthropic API error: " + anthropicRes.status, details: errBody }),
-          { status: anthropicRes.status, headers: { ...corsHeaders(allowed), "Content-Type": "application/json" } }
-        );
+      const aiOptions = {
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: message },
+        ],
+      };
+      if (mode === "parse") {
+        aiOptions.response_format = {
+          type: "json_schema",
+          json_schema: PARSE_SCHEMA,
+        };
       }
-      const data = await anthropicRes.json();
-      const text = data.content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
+      const result = await env.AI.run(MODEL, aiOptions);
+      const text = result.response || (typeof result === "string" ? result : JSON.stringify(result));
       return new Response(
         JSON.stringify({ text }),
         { headers: { ...corsHeaders(allowed), "Content-Type": "application/json" } }
