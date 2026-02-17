@@ -1,5 +1,5 @@
 {
-  "name": "home-inventory-proxy",
+  "name": "inventory",
   "main": "worker/proxy.js",
   "compatibility_date": "2025-01-01",
   "ai": {
