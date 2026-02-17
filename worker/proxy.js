@@ -49,19 +49,24 @@ export default {
           { status: 400, headers: { ...corsHeaders(allowed), "Content-Type": "application/json" } }
         );
       }
-      const aiOptions = {
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: message },
-        ],
-      };
+      const messages = [
+        { role: "system", content: system },
+        { role: "user", content: message },
+      ];
+      let result;
       if (mode === "parse") {
-        aiOptions.response_format = {
-          type: "json_schema",
-          json_schema: PARSE_SCHEMA,
-        };
+        try {
+          result = await env.AI.run(MODEL, {
+            messages,
+            response_format: { type: "json_schema", json_schema: PARSE_SCHEMA },
+          });
+        } catch {
+          // JSON mode failed — retry without it and let the frontend parse the response
+          result = await env.AI.run(MODEL, { messages });
+        }
+      } else {
+        result = await env.AI.run(MODEL, { messages });
       }
-      const result = await env.AI.run(MODEL, aiOptions);
       const text = result.response || (typeof result === "string" ? result : JSON.stringify(result));
       return new Response(
         JSON.stringify({ text }),
