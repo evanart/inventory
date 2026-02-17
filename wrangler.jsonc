@@ -1,8 +1,14 @@
 {
-  "name": "inventory",
-  "main": "worker/proxy.js",
-  "compatibility_date": "2025-01-01",
-  "ai": {
-    "binding": "AI"
-  }
+	"name": "inventory",
+	"main": "worker/proxy.js",
+	"compatibility_date": "2025-01-01",
+	"ai": {
+		"binding": "AI"
+	},
+	"kv_namespaces": [
+		{
+			"binding": "INVENTORY_KV",
+			"id": "a0d60862acd9471f85b08b0fdf8e8f89"
+		}
+	]
 }
