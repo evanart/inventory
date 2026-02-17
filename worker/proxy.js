@@ -24,6 +24,18 @@ const PARSE_SCHEMA = {
         required: ["name", "quantity", "path", "category"],
       },
     },
+    createLocations: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          type: { type: "string", enum: ["floor", "room"] },
+          parentPath: { type: "array", items: { type: "string" } },
+        },
+        required: ["name", "type", "parentPath"],
+      },
+    },
   },
   required: ["action", "items"],
 };
