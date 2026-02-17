@@ -236,15 +236,38 @@ function useSpeech() {
   return { listening, transcript, setTranscript, supported, toggle, error };
 }
 
-function loadData() {
+function loadDataLocal() {
   try { const d = localStorage.getItem(STORAGE_KEY); return d ? JSON.parse(d) : null; }
   catch(e) { return null; }
+}
+async function loadDataFromServer() {
+  if (!API_PROXY) return loadDataLocal();
+  try {
+    const res = await fetch(API_PROXY + "/data");
+    if (!res.ok) throw new Error("Server error " + res.status);
+    const data = await res.json();
+    if (data) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
+      return data;
+    }
+    return loadDataLocal();
+  } catch(e) {
+    console.warn("Failed to load from server, using local cache:", e);
+    return loadDataLocal();
+  }
 }
 const saveTimeout = { current: null };
 function debouncedSave(data) {
   clearTimeout(saveTimeout.current);
   saveTimeout.current = setTimeout(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) { console.error(e); }
+    if (API_PROXY) {
+      fetch(API_PROXY + "/data", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }).catch(e => console.warn("Failed to sync to server:", e));
+    }
   }, 500);
 }
 
@@ -490,7 +513,17 @@ export default function App() {
   useEffect(() => { inputRef.current = input; }, [input]);
   useEffect(() => { modeRef.current = mode; }, [mode]);
 
-  useEffect(() => { const d = loadData(); if (d) setTree(d); setReady(true); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    // Show local data immediately, then replace with server data
+    const local = loadDataLocal();
+    if (local) setTree(local);
+    loadDataFromServer().then(d => {
+      if (!cancelled && d) setTree(d);
+      if (!cancelled) setReady(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
   useEffect(() => { if (ready) debouncedSave(tree); }, [tree, ready]);
   useEffect(() => { if (speech.transcript) setInput(speech.transcript); }, [speech.transcript]);
 
