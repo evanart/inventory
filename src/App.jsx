@@ -167,12 +167,12 @@ function findOrCreatePath(tree, pathNames, types) {
   return { tree: updated, leafId: parentId };
 }
 
-async function apiCall(systemPrompt, userMessage) {
+async function apiCall(systemPrompt, userMessage, mode) {
   if (!API_PROXY) throw new Error("API proxy not configured. Set VITE_API_PROXY_URL.");
   const res = await fetch(API_PROXY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ system: systemPrompt, message: userMessage }),
+    body: JSON.stringify({ system: systemPrompt, message: userMessage, mode }),
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
@@ -191,7 +191,7 @@ async function parseWithClaude(text, tree) {
   walk(tree, [tree.name]);
   const summary = allNodes.filter(n => n.type !== "item").map(n => n.path).join("\n");
   const systemPrompt = "You extract item storage info from natural language and place it in a house hierarchy.\n\nCurrent structure:\n" + summary + "\n\nReturn ONLY valid JSON:\n{\n  \"action\": \"store\" | \"remove\",\n  \"items\": [{\n    \"name\": \"item name (singular lowercase)\",\n    \"quantity\": number or null,\n    \"path\": [\"Floor Name\", \"Room Name\", \"Container (optional)\", \"Sub-container (optional)\"],\n    \"category\": one of: " + CATEGORIES.join(", ") + "\n  }]\n}\n\nRules:\n- path = array from floor to most specific container\n- Match existing locations when clearly the same\n- New containers are fine\n- quantity null = unknown amount\n- \"the garage\" -> [\"Main Floor\", \"Garage\"]\n- \"wood shelf in the garage\" -> [\"Main Floor\", \"Garage\", \"Wood Shelf\"]";
-  const raw = await apiCall(systemPrompt, text);
+  const raw = await apiCall(systemPrompt, text, "parse");
   return JSON.parse(raw.replace(/```json|```/g, "").trim());
 }
 
@@ -201,7 +201,7 @@ async function searchWithClaude(query, tree) {
     return { ...item, fullPath: chain ? chain.map(n => n.name).join(" > ") : item.name };
   });
   const systemPrompt = "You help find items in a home inventory. Given a query and item list with full paths, return a helpful concise plain text answer. If nothing matches, say so.";
-  return await apiCall(systemPrompt, "Items:\n" + JSON.stringify(allItems) + "\n\nQuery: \"" + query + "\"");
+  return await apiCall(systemPrompt, "Items:\n" + JSON.stringify(allItems) + "\n\nQuery: \"" + query + "\"", "search");
 }
 
 function useSpeech() {
