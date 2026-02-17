@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 const STORAGE_KEY = "home-inventory-v2";
 const API_PROXY = import.meta.env.VITE_API_PROXY_URL || "";
+const API_KEY = import.meta.env.VITE_API_KEY || "";
 
 const DEFAULT_STRUCTURE = {
   id: "house", name: "House", type: "house", children: [
@@ -207,13 +208,20 @@ function findOrCreateLocation(tree, locationName, type, parentPath) {
 
 async function apiCall(systemPrompt, userMessage, mode) {
   if (!API_PROXY) throw new Error("API proxy not configured. Set VITE_API_PROXY_URL.");
+  const headers = { "Content-Type": "application/json" };
+  if (API_KEY) {
+    headers["Authorization"] = `Bearer ${API_KEY}`;
+  }
   const res = await fetch(API_PROXY, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ system: systemPrompt, message: userMessage, mode }),
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
+    if (res.status === 401) {
+      throw new Error("API key invalid or missing. Check VITE_API_KEY environment variable.");
+    }
     throw new Error("API error " + res.status + ": " + (errText || "Unknown error"));
   }
   const data = await res.json();
@@ -281,7 +289,11 @@ function loadDataLocal() {
 async function loadDataFromServer() {
   if (!API_PROXY) return loadDataLocal();
   try {
-    const res = await fetch(API_PROXY + "/data");
+    const headers = {};
+    if (API_KEY) {
+      headers["Authorization"] = `Bearer ${API_KEY}`;
+    }
+    const res = await fetch(API_PROXY + "/data", { headers });
     if (!res.ok) throw new Error("Server error " + res.status);
     const data = await res.json();
     if (data) {
@@ -300,9 +312,13 @@ function debouncedSave(data) {
   saveTimeout.current = setTimeout(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) { console.error(e); }
     if (API_PROXY) {
+      const headers = { "Content-Type": "application/json" };
+      if (API_KEY) {
+        headers["Authorization"] = `Bearer ${API_KEY}`;
+      }
       fetch(API_PROXY + "/data", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(data),
       }).catch(e => console.warn("Failed to sync to server:", e));
     }
