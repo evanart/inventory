@@ -166,6 +166,44 @@ function findOrCreatePath(tree, pathNames, types) {
   }
   return { tree: updated, leafId: parentId };
 }
+function moveNode(tree, nodeId, newParentId) {
+  const node = findNode(tree, nodeId);
+  if (!node || node.id === newParentId) return tree;
+  const newParent = findNode(tree, newParentId);
+  if (!newParent) return tree;
+  const nodeCopy = { ...node };
+  let updated = removeFromTree(tree, nodeId);
+  updated = addToTree(updated, newParentId, nodeCopy);
+  return updated;
+}
+function deleteNodeCascade(tree, nodeId) {
+  return removeFromTree(tree, nodeId);
+}
+function deleteNodePreserveChildren(tree, nodeId) {
+  const node = findNode(tree, nodeId);
+  if (!node) return tree;
+  const parent = findParentChain(tree, nodeId);
+  if (!parent || parent.length < 2) return removeFromTree(tree, nodeId);
+  const parentId = parent[parent.length - 2].id;
+  let updated = tree;
+  (node.children || []).forEach(child => {
+    updated = moveNode(updated, child.id, parentId);
+  });
+  updated = removeFromTree(updated, nodeId);
+  return updated;
+}
+function findOrCreateLocation(tree, locationName, type, parentPath) {
+  let current = tree;
+  for (const pathName of parentPath) {
+    const match = (current.children || []).find(c => c.name.toLowerCase() === pathName.toLowerCase());
+    if (match) current = match;
+    else return null;
+  }
+  const existing = (current.children || []).find(c => c.name.toLowerCase() === locationName.toLowerCase() && c.type === type);
+  if (existing) return tree;
+  const newNode = { id: uid(), name: locationName, type, children: [] };
+  return addToTree(tree, current.id, newNode);
+}
 
 async function apiCall(systemPrompt, userMessage, mode) {
   if (!API_PROXY) throw new Error("API proxy not configured. Set VITE_API_PROXY_URL.");
@@ -190,7 +228,7 @@ async function parseWithClaude(text, tree) {
   }
   walk(tree, [tree.name]);
   const summary = allNodes.filter(n => n.type !== "item").map(n => n.path).join("\n");
-  const systemPrompt = "You extract item storage info from natural language and place it in a house hierarchy.\n\nCurrent structure:\n" + summary + "\n\nReturn ONLY valid JSON:\n{\n  \"action\": \"store\" | \"remove\",\n  \"items\": [{\n    \"name\": \"item name (singular lowercase)\",\n    \"quantity\": number or null,\n    \"path\": [\"Floor Name\", \"Room Name\", \"Container (optional)\", \"Sub-container (optional)\"],\n    \"category\": one of: " + CATEGORIES.join(", ") + "\n  }]\n}\n\nRules:\n- path = array from floor to most specific container\n- Match existing locations when clearly the same\n- New containers are fine\n- quantity null = unknown amount\n- \"the garage\" -> [\"Main Floor\", \"Garage\"]\n- \"wood shelf in the garage\" -> [\"Main Floor\", \"Garage\", \"Wood Shelf\"]";
+  const systemPrompt = "You extract item storage info from natural language and place it in a house hierarchy.\n\nCurrent structure:\n" + summary + "\n\nReturn ONLY valid JSON:\n{\n  \"action\": \"store\" | \"remove\",\n  \"items\": [{\n    \"name\": \"item name (singular lowercase)\",\n    \"quantity\": number or null,\n    \"path\": [\"Floor Name\", \"Room Name\", \"Container (optional)\", \"Sub-container (optional)\"],\n    \"category\": one of: " + CATEGORIES.join(", ") + "\n  }],\n  \"createLocations\": [{\"name\": \"location name\", \"type\": \"floor\" | \"room\", \"parentPath\": [\"Floor Name\"] or []}]\n}\n\nRules:\n- path = array from floor to most specific container\n- Match existing locations when clearly the same\n- New containers are created automatically in the path\n- If user mentions a room or floor that doesn't exist, add it to createLocations\n- quantity null = unknown amount\n- \"the garage\" -> [\"Main Floor\", \"Garage\"]\n- \"wood shelf in the garage\" -> [\"Main Floor\", \"Garage\", \"Wood Shelf\"]\n- If user says \"store X in the guest bedroom on the main floor\", and guest bedroom doesn't exist, add {\"name\": \"Guest Bedroom\", \"type\": \"room\", \"parentPath\": [\"Main Floor\"]} to createLocations";
   const raw = await apiCall(systemPrompt, text, "parse");
   return JSON.parse(raw.replace(/```json|```/g, "").trim());
 }
@@ -312,12 +350,13 @@ function ItemCard({ node, onDelete, onEdit, onMove }) {
   );
 }
 
-function LocationCard({ node, onClick, onRename, onDelete }) {
+function LocationCard({ node, onClick, onRename, onDelete, onMove }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(node.name);
   const count = countItems(node);
   const color = TYPE_COLORS[node.type] || "#64748b";
-  const isDeletable = node.type === "container";
+  const isDeletable = node.type === "container" || node.type === "room" || node.type === "floor";
+  const isMovable = node.type === "room" || node.type === "floor" || node.type === "container";
 
   if (editing) {
     return (
@@ -365,8 +404,12 @@ function LocationCard({ node, onClick, onRename, onDelete }) {
       <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
         <button onClick={(e) => { e.stopPropagation(); setEditing(true); }} title="Rename"
           style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 13, padding: 4 }}>✏️</button>
+        {isMovable && (
+          <button onClick={(e) => { e.stopPropagation(); onMove(node); }} title="Move"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 13, padding: 4 }}>📂</button>
+        )}
         {isDeletable && (
-          <button onClick={(e) => { e.stopPropagation(); onDelete(node.id); }} title="Delete container"
+          <button onClick={(e) => { e.stopPropagation(); if (count > 0 && (node.type === "room" || node.type === "floor")) { if (confirm("This " + node.type + " contains " + count + " item(s). Delete anyway?")) onDelete(node.id); } else { onDelete(node.id); } }} title={"Delete " + node.type}
             style={{ background: "none", border: "none", cursor: "pointer", color: "#cbd5e1", fontSize: 13, padding: 4 }}>✕</button>
         )}
         <div onClick={() => onClick(node.id)} style={{ color: "#cbd5e1", fontSize: 18, padding: "0 2px", cursor: "pointer" }}>›</div>
@@ -458,6 +501,54 @@ function RenameModal({ node, onSave, onCancel }) {
   );
 }
 
+function MoveLocationModal({ node, tree, onMove, onCancel }) {
+  const locations = [];
+  function walk(n, path, depth) {
+    if (n.type !== "item") {
+      locations.push({ id: n.id, label: path.join(" > "), depth, name: n.name, type: n.type });
+      (n.children || []).forEach(c => walk(c, [...path, c.name], depth + 1));
+    }
+  }
+  walk(tree, [tree.name], 0);
+  const chain = findParentChain(tree, node.id);
+  const currentParentId = chain && chain.length >= 2 ? chain[chain.length - 2].id : null;
+  const validDestinations = locations.filter(l => {
+    if (l.id === node.id || l.id === currentParentId) return false;
+    if (node.type === "floor") return l.id === tree.id;
+    if (node.type === "room") return l.type === "floor";
+    if (node.type === "container") return l.type === "room" || l.type === "container";
+    return false;
+  });
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
+      onClick={onCancel}>
+      <div style={{ background: "#fff", borderRadius: 14, padding: 20, width: "100%", maxWidth: 400, maxHeight: "70vh", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Move "{node.name}"</div>
+        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>Select a new location</div>
+        <div style={{ flex: 1, overflow: "auto", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+          {validDestinations.length === 0 ? (
+            <div style={{ padding: "12px", textAlign: "center", color: "#94a3b8", fontSize: 12 }}>No valid destinations</div>
+          ) : (
+            validDestinations.map(loc => (
+              <button key={loc.id} onClick={() => onMove(loc.id)}
+                style={{
+                  display: "block", width: "100%", textAlign: "left", padding: "8px 12px",
+                  paddingLeft: 12 + (loc.depth - 1) * 16, border: "none", borderBottom: "1px solid #f1f5f9",
+                  background: "#fff", cursor: "pointer",
+                  fontSize: 13, color: "#334155",
+                  fontWeight: 400,
+                }}>
+                {TYPE_ICONS[loc.type]} {loc.name}
+              </button>
+            ))
+          )}
+        </div>
+        <button onClick={onCancel} style={{ marginTop: 12, padding: "9px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 function QuickAddItem({ onAdd, onCancel }) {
   const [name, setName] = useState("");
   const [cat, setCat] = useState("misc");
@@ -501,6 +592,7 @@ export default function App() {
   const [addingItem, setAddingItem] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [movingItem, setMovingItem] = useState(null);
+  const [movingLocation, setMovingLocation] = useState(null);
   const [renamingLocation, setRenamingLocation] = useState(null);
   const [undoStack, setUndoStack] = useState([]);
   const [showDataMenu, setShowDataMenu] = useState(false);
@@ -550,6 +642,11 @@ export default function App() {
         } else {
           setUndoStack(prev => [...prev.slice(-9), { tree: treeRef.current, label: "store" }]);
           let updated = treeRef.current;
+          if (parsed.createLocations && parsed.createLocations.length > 0) {
+            for (const loc of parsed.createLocations) {
+              updated = findOrCreateLocation(updated, loc.name, loc.type, loc.parentPath);
+            }
+          }
           const stored = [];
           for (const item of parsed.items) {
             const pathNames = item.path || [];
@@ -617,6 +714,15 @@ export default function App() {
     setTree(t => addToTree(t, currentId, { id: uid(), name, type: "container", children: [] }));
     setAdding(false);
   };
+  const handleMoveLocation = (destId) => {
+    if (!movingLocation) return;
+    setUndoStack(prev => [...prev.slice(-9), { tree, label: "move" }]);
+    const updated = moveNode(tree, movingLocation.id, destId);
+    setTree(updated);
+    setMovingLocation(null);
+    const destChain = findParentChain(updated, destId);
+    setMessage({ type: "success", text: 'Moved "' + movingLocation.name + '" to ' + (destChain ? destChain.map(n => n.name).join(" > ") : "new location") });
+  };
   const handleQuickAddItem = (name, cat) => {
     setUndoStack(prev => [...prev.slice(-9), { tree, label: "add" }]);
     setTree(t => addToTree(t, currentId, { id: uid(), name, type: "item", quantity: null, category: cat, children: [] }));
@@ -650,6 +756,7 @@ export default function App() {
     <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}>
       {editingItem && <EditItemModal item={editingItem} onSave={handleEditSave} onCancel={() => setEditingItem(null)} />}
       {movingItem && <MoveItemModal item={movingItem} tree={tree} onMove={handleMoveItem} onCancel={() => setMovingItem(null)} />}
+      {movingLocation && <MoveLocationModal node={movingLocation} tree={tree} onMove={handleMoveLocation} onCancel={() => setMovingLocation(null)} />}
       {renamingLocation && <RenameModal node={renamingLocation} onSave={(name) => { handleRenameLocation(renamingLocation.id, name); setRenamingLocation(null); }} onCancel={() => setRenamingLocation(null)} />}
 
       <div style={{ background: "linear-gradient(135deg,#1e293b,#334155)", padding: "20px 16px 14px", color: "#fff" }}>
@@ -804,7 +911,7 @@ export default function App() {
 
         {containers.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: items.length > 0 ? 14 : 0 }}>
-            {containers.map(c => <LocationCard key={c.id} node={c} onClick={setCurrentId} onRename={handleRenameLocation} onDelete={handleDelete} />)}
+            {containers.map(c => <LocationCard key={c.id} node={c} onClick={setCurrentId} onRename={handleRenameLocation} onDelete={handleDelete} onMove={setMovingLocation} />)}
           </div>
         )}
 
