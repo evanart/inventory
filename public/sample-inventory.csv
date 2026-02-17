@@ -1,0 +1,55 @@
+Floor,Room,Container,Item Name,Quantity,Category
+Main Floor,Garage,Wood Shelf,spare lightbulbs,6,electronics
+Main Floor,Garage,Wood Shelf,wd-40,2,tools
+Main Floor,Garage,Wood Shelf,gorilla glue,1,tools
+Main Floor,Garage,Wood Shelf,duct tape,3,tools
+Main Floor,Garage,Tool Bench,cordless drill,1,tools
+Main Floor,Garage,Tool Bench,socket set,1,tools
+Main Floor,Garage,Tool Bench,tape measure,2,tools
+Main Floor,Garage,Tool Bench,level,1,tools
+Main Floor,Garage,Holiday Bins,christmas lights,4,holiday
+Main Floor,Garage,Holiday Bins,halloween decorations,1,holiday
+Main Floor,Garage,Holiday Bins,easter baskets,3,holiday
+Main Floor,Kitchen,Upper Cabinets,coffee mugs,8,kitchen
+Main Floor,Kitchen,Upper Cabinets,dinner plates,12,kitchen
+Main Floor,Kitchen,Upper Cabinets,mixing bowls,3,kitchen
+Main Floor,Kitchen,Junk Drawer,batteries (aa),12,electronics
+Main Floor,Kitchen,Junk Drawer,scissors,2,tools
+Main Floor,Kitchen,Junk Drawer,rubber bands,,misc
+Main Floor,Kitchen,Junk Drawer,takeout menus,,misc
+Main Floor,Kitchen,Under Sink,dish soap,2,cleaning
+Main Floor,Kitchen,Under Sink,sponges,4,cleaning
+Main Floor,Kitchen,Under Sink,trash bags,1,cleaning
+Main Floor,Pantry,,canned tomatoes,6,kitchen
+Main Floor,Pantry,,pasta boxes,4,kitchen
+Main Floor,Pantry,,olive oil,2,kitchen
+Main Floor,Living Room,TV Console,roku remote,1,electronics
+Main Floor,Living Room,TV Console,hdmi cables,3,electronics
+Main Floor,Living Room,TV Console,game controllers,2,electronics
+Main Floor,Living Room,Bookshelf,board games,5,misc
+Main Floor,Living Room,Bookshelf,photo albums,3,misc
+Main Floor,Office (Main),Desk,usb hub,1,electronics
+Main Floor,Office (Main),Desk,drawing tablet,1,electronics
+Main Floor,Office (Main),Desk,blue pens,6,office
+Main Floor,Office (Main),File Cabinet,tax documents,,office
+Main Floor,Office (Main),File Cabinet,printer paper,2,office
+Upper Floor,Primary Bedroom,Nightstand,phone charger,2,electronics
+Upper Floor,Primary Bedroom,Nightstand,reading glasses,1,misc
+Upper Floor,Primary Bedroom,Closet Shelf,extra pillows,3,misc
+Upper Floor,Primary Bedroom,Closet Shelf,winter blankets,2,clothing
+Upper Floor,Bedroom 3,Toy Bin,stuffed animals,,baby
+Upper Floor,Bedroom 3,Toy Bin,building blocks,1,baby
+Upper Floor,Bedroom 3,Toy Bin,play kitchen set,1,baby
+Upper Floor,Bedroom 3,Book Shelf,picture books,15,baby
+Upper Floor,Bedroom 3,Book Shelf,coloring books,4,crafts
+Upper Floor,Laundry,,detergent,1,cleaning
+Upper Floor,Laundry,,dryer sheets,1,cleaning
+Upper Floor,Laundry,,stain remover,1,cleaning
+Lower Level,Exercise Room,,yoga mat,1,sports
+Lower Level,Exercise Room,,dumbbells (set),1,sports
+Lower Level,Exercise Room,,resistance bands,3,sports
+Lower Level,Exercise Room,,foam roller,1,sports
+Lower Level,Attic,Storage Bins,baby clothes (0-12mo),2,baby
+Lower Level,Attic,Storage Bins,old tax records,,office
+Lower Level,Attic,Storage Bins,camping tent,1,sports
+Lower Level,Attic,Storage Bins,sleeping bags,2,sports
