@@ -42,84 +42,6 @@ const DEFAULT_STRUCTURE = {
   ]
 };
 
-function buildTestData() {
-  const s = JSON.parse(JSON.stringify(DEFAULT_STRUCTURE));
-  const find = (id) => { const q = [s]; while (q.length) { const n = q.shift(); if (n.id === id) return n; (n.children||[]).forEach(c=>q.push(c)); } return null; };
-  const add = (pid, node) => { const p = find(pid); if (p) p.children.push(node); };
-  const mkC = (id,name) => ({id,name,type:"container",children:[]});
-  const mkI = (name,qty,cat) => ({id:"t"+Math.random().toString(36).slice(2,8),name,type:"item",quantity:qty,category:cat,children:[]});
-  add("garage", mkC("g_ws","Wood Shelf"));
-  add("g_ws", mkI("spare lightbulbs",6,"electronics"));
-  add("g_ws", mkI("wd-40",2,"tools"));
-  add("g_ws", mkI("gorilla glue",1,"tools"));
-  add("g_ws", mkI("duct tape",3,"tools"));
-  add("garage", mkC("g_tb","Tool Bench"));
-  add("g_tb", mkI("cordless drill",1,"tools"));
-  add("g_tb", mkI("socket set",1,"tools"));
-  add("g_tb", mkI("tape measure",2,"tools"));
-  add("g_tb", mkI("level",1,"tools"));
-  add("garage", mkC("g_hol","Holiday Bins"));
-  add("g_hol", mkI("christmas lights",4,"holiday"));
-  add("g_hol", mkI("halloween decorations",1,"holiday"));
-  add("g_hol", mkI("easter baskets",3,"holiday"));
-  add("kitchen", mkC("k_cab","Upper Cabinets"));
-  add("k_cab", mkI("coffee mugs",8,"kitchen"));
-  add("k_cab", mkI("dinner plates",12,"kitchen"));
-  add("k_cab", mkI("mixing bowls",3,"kitchen"));
-  add("kitchen", mkC("k_draw","Junk Drawer"));
-  add("k_draw", mkI("batteries (aa)",12,"electronics"));
-  add("k_draw", mkI("scissors",2,"tools"));
-  add("k_draw", mkI("rubber bands",null,"misc"));
-  add("k_draw", mkI("takeout menus",null,"misc"));
-  add("kitchen", mkC("k_under","Under Sink"));
-  add("k_under", mkI("dish soap",2,"cleaning"));
-  add("k_under", mkI("sponges",4,"cleaning"));
-  add("k_under", mkI("trash bags",1,"cleaning"));
-  add("pantry", mkI("canned tomatoes",6,"kitchen"));
-  add("pantry", mkI("pasta boxes",4,"kitchen"));
-  add("pantry", mkI("olive oil",2,"kitchen"));
-  add("living", mkC("l_tv","TV Console"));
-  add("l_tv", mkI("roku remote",1,"electronics"));
-  add("l_tv", mkI("hdmi cables",3,"electronics"));
-  add("l_tv", mkI("game controllers",2,"electronics"));
-  add("living", mkC("l_shelf","Bookshelf"));
-  add("l_shelf", mkI("board games",5,"misc"));
-  add("l_shelf", mkI("photo albums",3,"misc"));
-  add("office_main", mkC("o_desk","Desk"));
-  add("o_desk", mkI("usb hub",1,"electronics"));
-  add("o_desk", mkI("drawing tablet",1,"electronics"));
-  add("o_desk", mkI("blue pens",6,"office"));
-  add("office_main", mkC("o_cab","File Cabinet"));
-  add("o_cab", mkI("tax documents",null,"office"));
-  add("o_cab", mkI("printer paper",2,"office"));
-  add("primary_bed", mkC("pb_night","Nightstand"));
-  add("pb_night", mkI("phone charger",2,"electronics"));
-  add("pb_night", mkI("reading glasses",1,"misc"));
-  add("primary_bed", mkC("pb_closet","Closet Shelf"));
-  add("pb_closet", mkI("extra pillows",3,"misc"));
-  add("pb_closet", mkI("winter blankets",2,"clothing"));
-  add("bedroom_3", mkC("b3_toy","Toy Bin"));
-  add("b3_toy", mkI("stuffed animals",null,"baby"));
-  add("b3_toy", mkI("building blocks",1,"baby"));
-  add("b3_toy", mkI("play kitchen set",1,"baby"));
-  add("bedroom_3", mkC("b3_shelf","Book Shelf"));
-  add("b3_shelf", mkI("picture books",15,"baby"));
-  add("b3_shelf", mkI("coloring books",4,"crafts"));
-  add("laundry", mkI("detergent",1,"cleaning"));
-  add("laundry", mkI("dryer sheets",1,"cleaning"));
-  add("laundry", mkI("stain remover",1,"cleaning"));
-  add("exercise", mkI("yoga mat",1,"sports"));
-  add("exercise", mkI("dumbbells (set)",1,"sports"));
-  add("exercise", mkI("resistance bands",3,"sports"));
-  add("exercise", mkI("foam roller",1,"sports"));
-  add("attic", mkC("a_bins","Storage Bins"));
-  add("a_bins", mkI("baby clothes (0-12mo)",2,"baby"));
-  add("a_bins", mkI("old tax records",null,"office"));
-  add("a_bins", mkI("camping tent",1,"sports"));
-  add("a_bins", mkI("sleeping bags",2,"sports"));
-  return s;
-}
-
 const TYPE_ICONS = { house: "🏠", floor: "🏗", room: "🚪", container: "📦", item: "📌" };
 const TYPE_COLORS = { house: "#1e293b", floor: "#475569", room: "#2563eb", container: "#7c3aed", item: "#059669" };
 const CATEGORIES = ["tools","cleaning","electronics","holiday","clothing","kitchen","bathroom","office","sports","crafts","baby","storage","misc"];
@@ -204,6 +126,107 @@ function findOrCreateLocation(tree, locationName, type, parentPath) {
   if (existing) return tree;
   const newNode = { id: uid(), name: locationName, type, children: [] };
   return addToTree(tree, current.id, newNode);
+}
+
+function escapeCSVField(value) {
+  if (value == null) return "";
+  const str = String(value);
+  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+function parseCSV(text) {
+  const rows = [];
+  let i = 0;
+  while (i < text.length) {
+    const row = [];
+    while (i < text.length) {
+      if (text[i] === '"') {
+        i++;
+        let field = "";
+        while (i < text.length) {
+          if (text[i] === '"') {
+            if (i + 1 < text.length && text[i + 1] === '"') { field += '"'; i += 2; }
+            else { i++; break; }
+          } else { field += text[i]; i++; }
+        }
+        row.push(field);
+      } else {
+        let field = "";
+        while (i < text.length && text[i] !== ',' && text[i] !== '\n' && text[i] !== '\r') { field += text[i]; i++; }
+        row.push(field);
+      }
+      if (i < text.length && text[i] === ',') { i++; } else { break; }
+    }
+    if (i < text.length && text[i] === '\r') i++;
+    if (i < text.length && text[i] === '\n') i++;
+    if (row.length > 1 || (row.length === 1 && row[0].trim() !== "")) rows.push(row);
+  }
+  return rows;
+}
+
+function exportTreeToCSV(tree) {
+  const rows = [["Floor", "Room", "Container", "Item Name", "Quantity", "Category"]];
+  for (const floor of (tree.children || [])) {
+    if (floor.type !== "floor") continue;
+    for (const room of (floor.children || [])) {
+      if (room.type !== "room") continue;
+      for (const child of (room.children || [])) {
+        if (child.type === "item") {
+          rows.push([floor.name, room.name, "", child.name, child.quantity != null ? child.quantity : "", child.category || "misc"]);
+        }
+      }
+      function walkContainers(container, containerPath) {
+        for (const child of (container.children || [])) {
+          if (child.type === "item") {
+            rows.push([floor.name, room.name, containerPath, child.name, child.quantity != null ? child.quantity : "", child.category || "misc"]);
+          } else if (child.type === "container") {
+            walkContainers(child, containerPath + " > " + child.name);
+          }
+        }
+      }
+      for (const child of (room.children || [])) {
+        if (child.type === "container") walkContainers(child, child.name);
+      }
+    }
+  }
+  return rows.map(row => row.map(escapeCSVField).join(",")).join("\n");
+}
+
+function importCSVToTree(csvText) {
+  const rows = parseCSV(csvText);
+  if (rows.length < 2) throw new Error("CSV file is empty or has no data rows.");
+  let tree = JSON.parse(JSON.stringify(DEFAULT_STRUCTURE));
+  let count = 0;
+  const errors = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (row.every(cell => cell.trim() === "")) continue;
+    const floorName = (row[0] || "").trim();
+    const roomName = (row[1] || "").trim();
+    const containerStr = (row[2] || "").trim();
+    const itemName = (row[3] || "").trim();
+    const qtyStr = (row[4] || "").trim();
+    const category = (row[5] || "misc").trim().toLowerCase();
+    if (!floorName || !roomName || !itemName) { errors.push("Row " + (r + 1) + ": missing floor, room, or item name"); continue; }
+    const pathNames = [floorName, roomName];
+    const types = ["floor", "room"];
+    if (containerStr) {
+      for (const c of containerStr.split(" > ").map(s => s.trim()).filter(Boolean)) {
+        pathNames.push(c);
+        types.push("container");
+      }
+    }
+    const { tree: updated, leafId } = findOrCreatePath(tree, pathNames, types);
+    tree = updated;
+    const validCat = CATEGORIES.includes(category) ? category : "misc";
+    const quantity = qtyStr === "" ? null : (isNaN(Number(qtyStr)) ? null : Number(qtyStr));
+    tree = addToTree(tree, leafId, { id: uid(), name: itemName, type: "item", quantity, category: validCat, children: [] });
+    count++;
+  }
+  return { tree, count, errors };
 }
 
 async function apiCall(systemPrompt, userMessage, mode) {
@@ -614,6 +637,7 @@ export default function App() {
   const [showDataMenu, setShowDataMenu] = useState(false);
   const speech = useSpeech();
 
+  const fileInputRef = useRef(null);
   const treeRef = useRef(tree);
   const inputRef = useRef(input);
   const modeRef = useRef(mode);
@@ -744,12 +768,54 @@ export default function App() {
     setTree(t => addToTree(t, currentId, { id: uid(), name, type: "item", quantity: null, category: cat, children: [] }));
     setAddingItem(false);
   };
-  const handleLoadTestData = () => {
-    setUndoStack(prev => [...prev.slice(-9), { tree, label: "load test data" }]);
-    setTree(buildTestData());
-    setCurrentId("house");
+  const handleExportCSV = () => {
+    const csv = exportTreeToCSV(tree);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "home-inventory.csv";
+    a.click();
+    URL.revokeObjectURL(url);
     setShowDataMenu(false);
-    setMessage({ type: "success", text: "Loaded test data — 60+ items across your house." });
+    setMessage({ type: "success", text: "Exported " + flattenItems(tree).length + " items to CSV." });
+  };
+  const handleImportCSV = () => {
+    if (fileInputRef.current) fileInputRef.current.click();
+    setShowDataMenu(false);
+  };
+  const handleFileSelected = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const { tree: newTree, count, errors } = importCSVToTree(evt.target.result);
+        setUndoStack(prev => [...prev.slice(-9), { tree, label: "import" }]);
+        setTree(newTree);
+        setCurrentId("house");
+        let msg = "Imported " + count + " items from CSV.";
+        if (errors.length > 0) msg += " (" + errors.length + " row(s) skipped)";
+        setMessage({ type: "success", text: msg });
+      } catch (err) {
+        setMessage({ type: "error", text: "Import failed: " + err.message });
+      }
+      e.target.value = "";
+    };
+    reader.readAsText(file);
+  };
+  const handleLoadSampleData = () => {
+    setShowDataMenu(false);
+    fetch(import.meta.env.BASE_URL + "sample-inventory.csv")
+      .then(res => { if (!res.ok) throw new Error("Could not load sample data file."); return res.text(); })
+      .then(csvText => {
+        const { tree: newTree, count } = importCSVToTree(csvText);
+        setUndoStack(prev => [...prev.slice(-9), { tree, label: "load sample data" }]);
+        setTree(newTree);
+        setCurrentId("house");
+        setMessage({ type: "success", text: "Loaded sample data — " + count + " items across your house." });
+      })
+      .catch(err => { setMessage({ type: "error", text: "Failed to load sample data: " + err.message }); });
   };
   const handleClearAll = () => {
     setUndoStack(prev => [...prev.slice(-9), { tree, label: "clear all" }]);
@@ -796,13 +862,23 @@ export default function App() {
               {showDataMenu && (
                 <div style={{
                   position: "absolute", top: "100%", right: 0, marginTop: 6, background: "#fff",
-                  borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.15)", overflow: "hidden", zIndex: 50, minWidth: 180,
+                  borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.15)", overflow: "hidden", zIndex: 50, minWidth: 200,
                 }}>
-                  <button onClick={handleLoadTestData} style={{
+                  <button onClick={handleExportCSV} style={{
                     display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
                     border: "none", borderBottom: "1px solid #f1f5f9", background: "#fff",
                     fontSize: 13, color: "#334155", cursor: "pointer", fontWeight: 500,
-                  }}>📋 Load Test Data</button>
+                  }}>📤 Export CSV</button>
+                  <button onClick={handleImportCSV} style={{
+                    display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
+                    border: "none", borderBottom: "1px solid #f1f5f9", background: "#fff",
+                    fontSize: 13, color: "#334155", cursor: "pointer", fontWeight: 500,
+                  }}>📥 Import CSV</button>
+                  <button onClick={handleLoadSampleData} style={{
+                    display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
+                    border: "none", borderBottom: "1px solid #f1f5f9", background: "#fff",
+                    fontSize: 13, color: "#334155", cursor: "pointer", fontWeight: 500,
+                  }}>📋 Load Sample Data</button>
                   <button onClick={handleClearAll} style={{
                     display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
                     border: "none", background: "#fff",
@@ -834,7 +910,7 @@ export default function App() {
 
         {!nlpAvailable && mode === "browse" && totalItems === 0 && (
           <div style={{ padding: "10px 14px", borderRadius: 10, marginBottom: 12, fontSize: 12, lineHeight: 1.5, background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }}>
-            NLP features (Store & Find) require a Cloudflare Worker proxy. Browse mode and manual add work without it. Load test data from ⚙ to explore.
+            NLP features (Store & Find) require a Cloudflare Worker proxy. Browse mode and manual add work without it. Load sample data from ⚙ to explore.
           </div>
         )}
 
@@ -952,6 +1028,7 @@ export default function App() {
       </div>
 
       {showDataMenu && <div onClick={() => setShowDataMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />}
+      <input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={handleFileSelected} style={{ display: "none" }} />
     </div>
   );
 }
