@@ -865,24 +865,27 @@ export default function App() {
       {movingLocation && <MoveLocationModal node={movingLocation} tree={tree} onMove={handleMoveLocation} onCancel={() => setMovingLocation(null)} />}
       {renamingLocation && <RenameModal node={renamingLocation} onSave={(name) => { handleRenameLocation(renamingLocation.id, name); setRenamingLocation(null); }} onCancel={() => setRenamingLocation(null)} />}
 
-      <div style={{ background: "linear-gradient(135deg,#1e293b,#334155)", padding: "20px 16px 14px", color: "#fff" }}>
-        <div style={{ maxWidth: 600, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>🏠 Home Inventory</div>
-            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>{totalItems} items tracked</div>
+      <div style={{ background: "linear-gradient(135deg,#1e293b,#334155)", padding: "28px 16px 20px", color: "#fff" }}>
+        <div style={{ maxWidth: 600, margin: "0 auto", position: "relative" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 24, fontWeight: 300, letterSpacing: "0.12em", textTransform: "uppercase" }}>Home Inventory</div>
+            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 6, fontStyle: "italic", letterSpacing: "0.05em", fontWeight: 300 }}>Everything in its right place</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{totalItems} items tracked</div>
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 4, alignItems: "center" }}>
             {undoStack.length > 0 && (
               <button onClick={handleUndo} style={{
-                padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,.2)",
-                background: "rgba(255,255,255,.1)", color: "#e2e8f0", fontSize: 12, fontWeight: 600, cursor: "pointer",
-              }}>↩ Undo</button>
+                padding: "4px 8px", borderRadius: 6, border: "none",
+                background: "transparent", color: "#64748b", fontSize: 12, cursor: "pointer",
+                transition: "color 0.2s",
+              }} onMouseEnter={e => e.target.style.color = "#e2e8f0"} onMouseLeave={e => e.target.style.color = "#64748b"}>↩</button>
             )}
             <div style={{ position: "relative" }}>
               <button onClick={() => setShowDataMenu(!showDataMenu)} style={{
-                padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,.2)",
-                background: "rgba(255,255,255,.1)", color: "#e2e8f0", fontSize: 14, cursor: "pointer",
-              }}>⚙</button>
+                padding: "4px 8px", borderRadius: 6, border: "none",
+                background: "transparent", color: "#64748b", fontSize: 14, cursor: "pointer",
+                transition: "color 0.2s",
+              }} onMouseEnter={e => e.target.style.color = "#e2e8f0"} onMouseLeave={e => e.target.style.color = "#64748b"}>⚙</button>
               {showDataMenu && (
                 <div style={{
                   position: "absolute", top: "100%", right: 0, marginTop: 6, background: "#fff",
