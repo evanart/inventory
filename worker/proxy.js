@@ -73,7 +73,7 @@ export default {
           return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
         }
       }
-      if (request.method === "PUT") {
+      if (request.method === "PUT" || (request.method === "POST" && url.searchParams.has("key"))) {
         try {
           const body = await request.json();
           await env.INVENTORY_KV.put("inventory", JSON.stringify(body));
@@ -136,14 +136,17 @@ function corsHeaders(origin) {
 }
 
 function validateAuth(request, env) {
-  const authHeader = request.headers.get("Authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return false;
-  }
-  const token = authHeader.slice(7);
   const expectedKey = env.API_KEY;
-  if (!expectedKey || token !== expectedKey) {
-    return false;
+  if (!expectedKey) return false;
+  const authHeader = request.headers.get("Authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    return authHeader.slice(7) === expectedKey;
   }
-  return true;
+  // Fallback: accept key as query param (needed for navigator.sendBeacon which can't set headers)
+  const url = new URL(request.url);
+  const queryKey = url.searchParams.get("key");
+  if (queryKey) {
+    return queryKey === expectedKey;
+  }
+  return false;
 }

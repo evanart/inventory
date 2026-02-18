@@ -330,22 +330,27 @@ async function loadDataFromServer() {
   }
 }
 const saveTimeout = { current: null };
+function saveData(data) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) { console.error(e); }
+  if (API_PROXY) {
+    const headers = { "Content-Type": "application/json" };
+    if (API_KEY) {
+      headers["Authorization"] = `Bearer ${API_KEY}`;
+    }
+    fetch(API_PROXY + "/data", {
+      method: "PUT",
+      headers,
+      body: JSON.stringify(data),
+    }).catch(e => console.warn("Failed to sync to server:", e));
+  }
+}
 function debouncedSave(data) {
   clearTimeout(saveTimeout.current);
-  saveTimeout.current = setTimeout(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) { console.error(e); }
-    if (API_PROXY) {
-      const headers = { "Content-Type": "application/json" };
-      if (API_KEY) {
-        headers["Authorization"] = `Bearer ${API_KEY}`;
-      }
-      fetch(API_PROXY + "/data", {
-        method: "PUT",
-        headers,
-        body: JSON.stringify(data),
-      }).catch(e => console.warn("Failed to sync to server:", e));
-    }
-  }, 500);
+  saveTimeout.current = setTimeout(() => saveData(data), 500);
+}
+function flushSave(data) {
+  clearTimeout(saveTimeout.current);
+  saveData(data);
 }
 
 function Breadcrumb({ chain, onNavigate }) {
@@ -657,6 +662,21 @@ export default function App() {
     return () => { cancelled = true; };
   }, []);
   useEffect(() => { if (ready) debouncedSave(tree); }, [tree, ready]);
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (saveTimeout.current) {
+        clearTimeout(saveTimeout.current);
+        saveTimeout.current = null;
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tree)); } catch(e) { /* noop */ }
+        if (API_PROXY) {
+          const url = API_KEY ? `${API_PROXY}/data?key=${encodeURIComponent(API_KEY)}` : `${API_PROXY}/data`;
+          navigator.sendBeacon(url, JSON.stringify(tree));
+        }
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [tree]);
   useEffect(() => { if (speech.transcript) setInput(speech.transcript); }, [speech.transcript]);
 
   const handleSubmit = useCallback(async () => {
@@ -793,6 +813,7 @@ export default function App() {
         const { tree: newTree, count, errors } = importCSVToTree(evt.target.result);
         setUndoStack(prev => [...prev.slice(-9), { tree, label: "import" }]);
         setTree(newTree);
+        flushSave(newTree);
         setCurrentId("house");
         let msg = "Imported " + count + " items from CSV.";
         if (errors.length > 0) msg += " (" + errors.length + " row(s) skipped)";
@@ -812,14 +833,17 @@ export default function App() {
         const { tree: newTree, count } = importCSVToTree(csvText);
         setUndoStack(prev => [...prev.slice(-9), { tree, label: "load sample data" }]);
         setTree(newTree);
+        flushSave(newTree);
         setCurrentId("house");
         setMessage({ type: "success", text: "Loaded sample data — " + count + " items across your house." });
       })
       .catch(err => { setMessage({ type: "error", text: "Failed to load sample data: " + err.message }); });
   };
   const handleClearAll = () => {
+    const emptyTree = JSON.parse(JSON.stringify(DEFAULT_STRUCTURE));
     setUndoStack(prev => [...prev.slice(-9), { tree, label: "clear all" }]);
-    setTree(JSON.parse(JSON.stringify(DEFAULT_STRUCTURE)));
+    setTree(emptyTree);
+    flushSave(emptyTree);
     setCurrentId("house");
     setShowDataMenu(false);
     setMessage({ type: "info", text: "All items and containers cleared. House structure preserved." });

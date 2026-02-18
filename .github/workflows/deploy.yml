@@ -21,6 +21,7 @@ jobs:
         run: npm run build
         env:
           VITE_API_PROXY_URL: https://inventory.evan-56b.workers.dev
+          VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
 
       - name: Add .htaccess for SPA routing
         run: |
