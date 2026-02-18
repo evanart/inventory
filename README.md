@@ -228,17 +228,11 @@ inventory/
    wrangler deploy --env production
    ```
 
-7. **Deploy frontend to any static host** (Vercel, Netlify, GitHub Pages):
-   ```bash
-   # Create .env.production with:
-   VITE_API_PROXY_URL=https://your-worker-url.workers.dev
-   VITE_API_KEY=<same key from step 4>
+7. **Add `VITE_API_KEY` as a GitHub Actions secret:**
+   - Go to repo Settings → Secrets and variables → Actions → New repository secret
+   - Name: `VITE_API_KEY`, Value: same key from step 4
 
-   npm run build
-   # Upload dist/ folder
-   ```
-
-8. **Update frontend env** to point to deployed worker URL
+8. **Deploy frontend** — pushes to `main` trigger GitHub Actions (build + SFTP deploy)
 
 ### Rotating API Keys
 
@@ -248,7 +242,7 @@ wrangler secret put API_KEY --env production
 # Enter the new key when prompted
 ```
 
-Then update frontend `.env.production` and redeploy frontend.
+Then update the `VITE_API_KEY` GitHub Actions secret and push to `main` to redeploy the frontend.
 
 ## 🔐 Security & Known Issues
 
@@ -281,8 +275,8 @@ Then update frontend `.env.production` and redeploy frontend.
 ### Best Practices
 
 - **Keep API_KEY secret** - Never commit to git or share publicly
-- **Rotate keys regularly** - Use `wrangler secret put API_KEY --env production`
-- **Back up your inventory** regularly using Export feature (when available)
+- **Rotate keys regularly** - Use `wrangler secret put API_KEY --env production` and update the `VITE_API_KEY` GitHub secret
+- **Back up your inventory** regularly using the CSV Export feature
 - **Review AI output** - check that parsed items are correct before storing
 - **Test in development first** - use localhost before connecting to production
 - **Generate strong keys** - Use `openssl rand -base64 32` for production keys
@@ -296,10 +290,11 @@ Then update frontend `.env.production` and redeploy frontend.
   - Bearer token support
   - Future: JWT tokens for multi-user scenarios
 
-- [ ] **Data Export/Import**
-  - Export inventory as JSON or CSV for backup/sharing
+- [x] **Data Export/Import** ✓
+  - Export inventory as CSV for backup/sharing
   - Import from CSV to bulk-create items
-  - UI: Add "Export" and "Import" buttons in settings menu
+  - Load sample data from built-in CSV
+  - Immediate server persistence on import (no data loss on tab close)
 
 - [ ] **Duplicate Detection**
   - AI-powered deduplication when storing items
@@ -455,7 +450,7 @@ setTree(t => removeFromTree(t, nodeId));
 
 ### Loading Test Data
 
-Use the ⚙️ menu → "Load Test Data" to populate with 60+ items for testing.
+Use the ⚙️ menu → "Load Sample Data" to populate with sample items for testing.
 
 ## 📚 Resources
 

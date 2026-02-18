@@ -48,8 +48,8 @@ wrangler.jsonc       # Worker configuration
 
 - **Data model**: Hierarchical tree (house → floor → room → container → item)
 - **Modes**: Browse (navigate tree), Store (AI parse natural language), Find (AI search)
-- **API endpoints**: `POST /` (AI inference), `GET /data` (fetch), `PUT /data` (save)
-- **Auth**: Bearer token on all endpoints, key in `API_KEY` env var
+- **API endpoints**: `POST /` (AI inference), `GET /data` (fetch), `PUT /data` (save), `POST /data?key=` (beacon save)
+- **Auth**: Bearer token on all endpoints, key in `API_KEY` env var; also accepts `?key=` query param for sendBeacon
 
 ## Code Conventions
 
@@ -70,12 +70,16 @@ VITE_API_KEY=dev-key-12345
 # Worker (secrets)
 API_KEY=<secret>
 ALLOWED_ORIGIN=*  # optional, restricts CORS
+
+# GitHub Actions (secrets)
+VITE_API_KEY=<must match worker API_KEY>
 ```
 
 ## Key Patterns
 
 - Tree utilities are pure functions at the top of App.jsx (findNode, findParentChain, findOrCreatePath)
-- Debounced saves (500ms) to both localStorage and server
+- Debounced saves (500ms) to both localStorage and server; immediate flush (`flushSave`) on import/clear/sample-load
+- `beforeunload` handler uses `navigator.sendBeacon` to persist pending saves on tab close
 - Undo stack (last 10 actions with labels)
 - AI responses use JSON schema validation for store/remove parsing
 - Auto-creates missing rooms/floors from natural language input
