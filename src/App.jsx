@@ -76,6 +76,58 @@ function updateInTree(t, id, updates) {
   return { ...t, children: (t.children || []).map(c => updateInTree(c, id, updates)) };
 }
 function flattenItems(n) { return n.type === "item" ? [n] : (n.children || []).flatMap(c => flattenItems(c)); }
+function normalizeName(name) {
+  let n = name.toLowerCase().trim();
+  if (n.endsWith('ies') && n.length > 4) return n.slice(0, -3) + 'y';
+  if (n.endsWith('ses') || n.endsWith('xes') || n.endsWith('zes')) return n.slice(0, -2);
+  if (n.endsWith('ches') || n.endsWith('shes')) return n.slice(0, -2);
+  if (n.endsWith('s') && !n.endsWith('ss') && n.length > 2) return n.slice(0, -1);
+  return n;
+}
+function itemsSimilar(name1, name2) {
+  const n1 = normalizeName(name1);
+  const n2 = normalizeName(name2);
+  if (n1 === n2) return true;
+  if (n1.length > 2 && n2.length > 2 && (n1.includes(n2) || n2.includes(n1))) return true;
+  const t1 = n1.split(/\s+/).filter(w => w.length > 2);
+  const t2 = n2.split(/\s+/).filter(w => w.length > 2);
+  if (t1.length > 1 && t2.length > 1) {
+    const shared = t1.filter(w => t2.some(w2 => normalizeName(w) === normalizeName(w2)));
+    if (shared.length >= Math.min(t1.length, t2.length) * 0.5 && shared.length > 0) return true;
+  }
+  return false;
+}
+function findSimilarItems(tree, itemName, excludeIds) {
+  return flattenItems(tree)
+    .filter(item => !(excludeIds || []).includes(item.id) && itemsSimilar(item.name, itemName))
+    .map(item => {
+      const chain = findParentChain(tree, item.id);
+      return { ...item, fullPath: chain ? chain.map(n => n.name).join(" > ") : item.name };
+    });
+}
+function findAllDuplicateGroups(tree) {
+  const allItems = flattenItems(tree).map(item => {
+    const chain = findParentChain(tree, item.id);
+    return { ...item, fullPath: chain ? chain.map(n => n.name).join(" > ") : item.name };
+  });
+  const groups = [], processed = new Set();
+  for (let i = 0; i < allItems.length; i++) {
+    if (processed.has(allItems[i].id)) continue;
+    const group = [allItems[i]];
+    for (let j = i + 1; j < allItems.length; j++) {
+      if (processed.has(allItems[j].id)) continue;
+      if (itemsSimilar(allItems[i].name, allItems[j].name)) {
+        group.push(allItems[j]);
+        processed.add(allItems[j].id);
+      }
+    }
+    if (group.length > 1) {
+      groups.push(group);
+      processed.add(allItems[i].id);
+    }
+  }
+  return groups;
+}
 function findOrCreatePath(tree, pathNames, types) {
   let updated = { ...tree }, parentId = tree.id;
   for (let i = 0; i < pathNames.length; i++) {
@@ -625,6 +677,114 @@ function AddContainerInline({ onAdd, onCancel }) {
   );
 }
 
+function DuplicateSuggestionModal({ pendingStore, onResolve, onCancel }) {
+  const itemsWithDupes = pendingStore.items.map((item, idx) => ({ ...item, idx })).filter(item => item.duplicates.length > 0);
+  const [choices, setChoices] = useState(() =>
+    pendingStore.items.map(item => ({
+      action: item.duplicates.length > 0 ? "add" : "add",
+      targetId: item.duplicates.length > 0 ? item.duplicates[0].id : null
+    }))
+  );
+  const setChoice = (idx, action, targetId) => {
+    setChoices(prev => prev.map((c, i) => i === idx ? { action, targetId: targetId !== undefined ? targetId : c.targetId } : c));
+  };
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
+      onClick={onCancel}>
+      <div style={{ background: "#fff", borderRadius: 14, padding: 20, width: "100%", maxWidth: 440, maxHeight: "80vh", display: "flex", flexDirection: "column", animation: "fadeIn .2s ease" }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Similar Items Found</div>
+        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14 }}>These items may already exist in your inventory.</div>
+        <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+          {itemsWithDupes.map(item => {
+            const choice = choices[item.idx];
+            return (
+              <div key={item.idx} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 4 }}>
+                  Storing "{item.name}"{item.quantity != null && " ×" + item.quantity} in {item.targetPath}
+                </div>
+                <div style={{ fontSize: 11, color: "#64748b", marginBottom: 6 }}>Found similar:</div>
+                {item.duplicates.map(dup => (
+                  <div key={dup.id} style={{
+                    display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", marginBottom: 4,
+                    borderRadius: 6, background: choice.targetId === dup.id ? "#f0f4ff" : "#f8fafc",
+                    border: "1px solid " + (choice.targetId === dup.id ? "#bfdbfe" : "#f1f5f9"),
+                    cursor: "pointer", fontSize: 12,
+                  }} onClick={() => setChoice(item.idx, choice.action, dup.id)}>
+                    <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{dup.name}</span>
+                    {dup.quantity != null && <span style={{ color: "#94a3b8" }}>×{dup.quantity}</span>}
+                    <span style={{ color: "#94a3b8", fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dup.fullPath}</span>
+                    {choice.targetId === dup.id && <span style={{ color: "#2563eb", flexShrink: 0 }}>●</span>}
+                  </div>
+                ))}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
+                  {[
+                    { action: "add", label: "Store Here Too" },
+                    { action: "addToExisting", label: "Add to Existing" },
+                    { action: "moveHere", label: "Move Here" },
+                    { action: "skip", label: "Skip" },
+                  ].map(opt => (
+                    <button key={opt.action} onClick={() => setChoice(item.idx, opt.action)}
+                      style={{
+                        padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                        border: choice.action === opt.action ? "none" : "1px solid #e2e8f0",
+                        background: choice.action === opt.action
+                          ? (opt.action === "skip" ? "#fee2e2" : "#2563eb") : "#fff",
+                        color: choice.action === opt.action
+                          ? (opt.action === "skip" ? "#991b1b" : "#fff") : "#64748b",
+                      }}>{opt.label}</button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+          <button onClick={onCancel} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+          <button onClick={() => onResolve(choices)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "none", background: "#2563eb", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Confirm</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DuplicateScanModal({ groups, onMerge, onClose }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
+      onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 14, padding: 20, width: "100%", maxWidth: 440, maxHeight: "80vh", display: "flex", flexDirection: "column", animation: "fadeIn .2s ease" }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Duplicate Scan</div>
+        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14 }}>
+          {groups.length > 0 ? groups.length + " group" + (groups.length !== 1 ? "s" : "") + " of similar items found." : "No duplicate items found in your inventory."}
+        </div>
+        <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+          {groups.map((group, gIdx) => (
+            <div key={gIdx} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#1e293b", marginBottom: 6, textTransform: "capitalize" }}>
+                Similar: "{group[0].name}"
+              </div>
+              {group.map(item => (
+                <div key={item.id} style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", marginBottom: 3,
+                  borderRadius: 6, background: "#f8fafc", fontSize: 12,
+                }}>
+                  <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{item.name}</span>
+                  {item.quantity != null && <span style={{ color: "#94a3b8" }}>×{item.quantity}</span>}
+                  <span style={{ color: "#94a3b8", fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.fullPath}</span>
+                  <button onClick={() => onMerge(group, item.id)} title="Merge all into this one"
+                    style={{ padding: "2px 8px", borderRadius: 4, border: "1px solid #e2e8f0", background: "#fff", color: "#2563eb", fontSize: 10, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>Keep</button>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        <button onClick={onClose} style={{ marginTop: 14, padding: "9px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Close</button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [tree, setTree] = useState(DEFAULT_STRUCTURE);
   const [currentId, setCurrentId] = useState("house");
@@ -641,6 +801,8 @@ export default function App() {
   const [renamingLocation, setRenamingLocation] = useState(null);
   const [undoStack, setUndoStack] = useState([]);
   const [showDataMenu, setShowDataMenu] = useState(false);
+  const [pendingStore, setPendingStore] = useState(null);
+  const [duplicateScanResults, setDuplicateScanResults] = useState(null);
   const speech = useSpeech();
 
   const fileInputRef = useRef(null);
@@ -705,29 +867,43 @@ export default function App() {
           setTree(updated);
           setMessage({ type: "success", text: "Removed: " + parsed.items.map(i => i.name).join(", ") });
         } else {
-          setUndoStack(prev => [...prev.slice(-9), { tree: treeRef.current, label: "store" }]);
           let updated = treeRef.current;
           if (parsed.createLocations && parsed.createLocations.length > 0) {
             for (const loc of parsed.createLocations) {
               updated = findOrCreateLocation(updated, loc.name, loc.type, loc.parentPath);
             }
           }
-          const stored = [];
+          const preparedItems = [];
+          let tempTree = updated;
+          let hasDuplicates = false;
           for (const item of parsed.items) {
             const pathNames = item.path || [];
             const types = pathNames.map((_, i) => i === 0 ? "floor" : i === 1 ? "room" : "container");
-            const { tree: t, leafId } = findOrCreatePath(updated, pathNames, types);
-            updated = t;
-            const itemNode = { id: uid(), name: item.name, type: "item", quantity: item.quantity, category: item.category || "misc", children: [] };
-            const parent = findNode(updated, leafId);
-            const existing = (parent.children || []).find(c => c.type === "item" && c.name === item.name);
-            if (existing) updated = removeFromTree(updated, existing.id);
-            updated = addToTree(updated, leafId, itemNode);
-            const chain = findParentChain(updated, itemNode.id);
-            stored.push(chain ? chain.map(n => n.name).join(" > ") : item.name);
+            const { tree: t, leafId } = findOrCreatePath(tempTree, pathNames, types);
+            tempTree = t;
+            const chain = findParentChain(tempTree, leafId);
+            const targetPath = chain ? chain.map(n => n.name).join(" > ") : pathNames.join(" > ");
+            const duplicates = findSimilarItems(tempTree, item.name);
+            if (duplicates.length > 0) hasDuplicates = true;
+            preparedItems.push({ ...item, leafId, targetPath, duplicates });
           }
-          setTree(updated);
-          setMessage({ type: "success", text: "Stored: " + stored.join("; ") });
+          if (hasDuplicates) {
+            setPendingStore({ items: preparedItems, treeWithPaths: tempTree, undoTree: treeRef.current });
+          } else {
+            setUndoStack(prev => [...prev.slice(-9), { tree: treeRef.current, label: "store" }]);
+            const stored = [];
+            for (const item of preparedItems) {
+              const parent = findNode(tempTree, item.leafId);
+              const existing = (parent.children || []).find(c => c.type === "item" && c.name === item.name);
+              if (existing) tempTree = removeFromTree(tempTree, existing.id);
+              const itemNode = { id: uid(), name: item.name, type: "item", quantity: item.quantity, category: item.category || "misc", children: [] };
+              tempTree = addToTree(tempTree, item.leafId, itemNode);
+              const ch = findParentChain(tempTree, itemNode.id);
+              stored.push(ch ? ch.map(n => n.name).join(" > ") : item.name);
+            }
+            setTree(tempTree);
+            setMessage({ type: "success", text: "Stored: " + stored.join("; ") });
+          }
         }
       }
     } catch (e) {
@@ -736,6 +912,70 @@ export default function App() {
     }
     setInput(""); speech.setTranscript(""); setLoading(false);
   }, [speech]);
+
+  const handleResolveDuplicates = useCallback((choices) => {
+    if (!pendingStore) return;
+    setUndoStack(prev => [...prev.slice(-9), { tree: pendingStore.undoTree, label: "store" }]);
+    let updated = pendingStore.treeWithPaths;
+    const stored = [];
+    for (let i = 0; i < pendingStore.items.length; i++) {
+      const item = pendingStore.items[i];
+      const choice = choices[i];
+      if (choice.action === "skip") continue;
+      if (choice.action === "addToExisting" && choice.targetId) {
+        const existing = findNode(updated, choice.targetId);
+        if (existing) {
+          const newQty = (existing.quantity != null || item.quantity != null)
+            ? (existing.quantity || 0) + (item.quantity || 0) : null;
+          updated = updateInTree(updated, existing.id, { quantity: newQty });
+          const chain = findParentChain(updated, existing.id);
+          stored.push((chain ? chain.map(n => n.name).join(" > ") : existing.name) + " (updated qty)");
+        }
+      } else if (choice.action === "moveHere" && choice.targetId) {
+        const existing = findNode(updated, choice.targetId);
+        if (existing) {
+          updated = removeFromTree(updated, existing.id);
+          const movedNode = { ...existing, quantity: item.quantity != null ? item.quantity : existing.quantity };
+          updated = addToTree(updated, item.leafId, movedNode);
+          const chain = findParentChain(updated, movedNode.id);
+          stored.push((chain ? chain.map(n => n.name).join(" > ") : item.name) + " (moved)");
+        }
+      } else {
+        const parent = findNode(updated, item.leafId);
+        const existingInSameLocation = (parent.children || []).find(c => c.type === "item" && c.name === item.name);
+        if (existingInSameLocation) updated = removeFromTree(updated, existingInSameLocation.id);
+        const itemNode = { id: uid(), name: item.name, type: "item", quantity: item.quantity, category: item.category || "misc", children: [] };
+        updated = addToTree(updated, item.leafId, itemNode);
+        const chain = findParentChain(updated, itemNode.id);
+        stored.push(chain ? chain.map(n => n.name).join(" > ") : item.name);
+      }
+    }
+    setTree(updated);
+    setPendingStore(null);
+    if (stored.length > 0) setMessage({ type: "success", text: "Stored: " + stored.join("; ") });
+    else setMessage({ type: "info", text: "No items stored." });
+  }, [pendingStore]);
+
+  const handleDuplicateScan = () => {
+    const groups = findAllDuplicateGroups(tree);
+    setDuplicateScanResults(groups);
+    setShowDataMenu(false);
+  };
+  const handleMergeDuplicates = (group, keepId) => {
+    setUndoStack(prev => [...prev.slice(-9), { tree, label: "merge" }]);
+    let updated = tree;
+    const keep = group.find(item => item.id === keepId);
+    if (!keep) return;
+    let totalQty = 0, hasQty = false;
+    for (const item of group) {
+      if (item.quantity != null) { totalQty += item.quantity; hasQty = true; }
+      if (item.id !== keepId) updated = removeFromTree(updated, item.id);
+    }
+    if (hasQty) updated = updateInTree(updated, keepId, { quantity: totalQty });
+    setTree(updated);
+    setDuplicateScanResults(findAllDuplicateGroups(updated));
+    setMessage({ type: "success", text: 'Merged ' + group.length + ' items into "' + keep.name + '"' });
+  };
 
   const prevListening = useRef(false);
   useEffect(() => {
@@ -869,6 +1109,8 @@ export default function App() {
       {movingItem && <MoveItemModal item={movingItem} tree={tree} onMove={handleMoveItem} onCancel={() => setMovingItem(null)} />}
       {movingLocation && <MoveLocationModal node={movingLocation} tree={tree} onMove={handleMoveLocation} onCancel={() => setMovingLocation(null)} />}
       {renamingLocation && <RenameModal node={renamingLocation} onSave={(name) => { handleRenameLocation(renamingLocation.id, name); setRenamingLocation(null); }} onCancel={() => setRenamingLocation(null)} />}
+      {pendingStore && <DuplicateSuggestionModal pendingStore={pendingStore} onResolve={handleResolveDuplicates} onCancel={() => setPendingStore(null)} />}
+      {duplicateScanResults && <DuplicateScanModal groups={duplicateScanResults} onMerge={handleMergeDuplicates} onClose={() => setDuplicateScanResults(null)} />}
 
       <div style={{ background: "linear-gradient(135deg,#1e293b,#334155)", padding: "28px 16px 20px", color: "#fff" }}>
         <div style={{ maxWidth: 600, margin: "0 auto", position: "relative" }}>
@@ -911,6 +1153,11 @@ export default function App() {
                     border: "none", borderBottom: "1px solid #f1f5f9", background: "#fff",
                     fontSize: 13, color: "#334155", cursor: "pointer", fontWeight: 500,
                   }}>📋 Load Sample Data</button>
+                  <button onClick={handleDuplicateScan} style={{
+                    display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
+                    border: "none", borderBottom: "1px solid #f1f5f9", background: "#fff",
+                    fontSize: 13, color: "#334155", cursor: "pointer", fontWeight: 500,
+                  }}>🔍 Find Duplicates</button>
                   <button onClick={handleClearAll} style={{
                     display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
                     border: "none", background: "#fff",
