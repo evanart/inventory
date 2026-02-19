@@ -75,6 +75,13 @@ ALLOWED_ORIGIN=*  # optional, restricts CORS
 VITE_API_KEY=<must match worker API_KEY>
 ```
 
+## Planned: Siri Shortcuts Integration (High Priority)
+
+- Add a `POST /shortcut` endpoint to `worker/proxy.js` that loads inventory from KV, accepts `{text, mode}`, runs AI parsing, saves to KV, and returns a plain confirmation string
+- Apple Shortcuts (no native app needed) will call this endpoint: dictate text → POST to Worker → show result
+- Siri trigger: user says "Hey Siri, Home Inventory" → mic activates → user speaks command → result displayed
+- Shortcuts distributable via iCloud share link; API key entered on install via Import Question
+
 ## Key Patterns
 
 - Tree utilities are pure functions at the top of App.jsx (findNode, findParentChain, findOrCreatePath)

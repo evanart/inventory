@@ -321,6 +321,14 @@ Then update the `VITE_API_KEY` GitHub Actions secret and push to `main` to redep
   - Load sample data from built-in CSV
   - Immediate server persistence on import (no data loss on tab close)
 
+- [ ] **Siri Shortcuts Integration**
+  - Add `POST /shortcut` endpoint on the Worker that auto-loads inventory from KV, accepts natural language text, and returns a simple confirmation string
+  - Support both "store" and "find" modes via query param or JSON field
+  - Build Apple Shortcuts (shareable via iCloud link) that: activate mic dictation, POST to the Worker, and display the result
+  - Provide step-by-step setup instructions in the app UI and/or an "Add to Siri" link
+  - Two-step Siri flow: "Hey Siri, Home Inventory" → speak command → see result
+  - No native iOS app required — Shortcuts calls the Worker API directly
+
 - [ ] **Duplicate Detection**
   - AI-powered deduplication when storing items
   - Manual merge interface for combining similar items
@@ -380,6 +388,7 @@ Then update the `VITE_API_KEY` GitHub Actions secret and push to `main` to redep
   - Expiration warnings for food/medicine
 
 - [ ] **Integrations**
+  - ~~Siri Shortcuts~~ (moved to High Priority)
   - Google Home / Alexa skill for voice control
   - IFTTT recipe support
   - Sync with shopping apps (add to cart from inventory)
