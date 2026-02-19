@@ -1,4 +1,27 @@
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+const MAX_BODY_SIZE = 5 * 1024 * 1024; // 5MB limit for /data
+const MAX_AI_INPUT_LENGTH = 10000; // max chars for system + message fields
+const RATE_LIMIT_WINDOW = 60_000; // 1 minute
+const RATE_LIMIT_MAX_AI = 30; // max AI requests per window
+const RATE_LIMIT_MAX_DATA = 60; // max data requests per window
+
+const rateLimitMap = new Map();
+
+function checkRateLimit(key, max) {
+  const now = Date.now();
+  let bucket = rateLimitMap.get(key);
+  if (!bucket || now - bucket.start > RATE_LIMIT_WINDOW) {
+    bucket = { start: now, count: 0 };
+    rateLimitMap.set(key, bucket);
+  }
+  bucket.count++;
+  if (rateLimitMap.size > 10000) {
+    for (const [k, v] of rateLimitMap) {
+      if (now - v.start > RATE_LIMIT_WINDOW) rateLimitMap.delete(k);
+    }
+  }
+  return bucket.count <= max;
+}
 
 const PARSE_SCHEMA = {
   type: "object",
@@ -50,8 +73,11 @@ export default {
     }
 
     const origin = request.headers.get("Origin") || "";
-    if (allowed !== "*" && !origin.includes(new URL(allowed).hostname)) {
-      return new Response("Forbidden", { status: 403 });
+    if (allowed !== "*") {
+      const allowedOrigin = new URL(allowed).origin;
+      if (origin !== allowedOrigin) {
+        return new Response("Forbidden", { status: 403 });
+      }
     }
 
     if (!validateAuth(request, env)) {
@@ -59,9 +85,13 @@ export default {
     }
 
     const url = new URL(request.url);
+    const clientIP = request.headers.get("CF-Connecting-IP") || "unknown";
 
     // --- KV data endpoints ---
     if (url.pathname === "/data") {
+      if (!checkRateLimit("data:" + clientIP, RATE_LIMIT_MAX_DATA)) {
+        return new Response(JSON.stringify({ error: "Too many requests" }), { status: 429, headers });
+      }
       if (request.method === "GET") {
         try {
           const data = await env.INVENTORY_KV.get("inventory", "json");
@@ -70,16 +100,27 @@ export default {
           }
           return new Response(JSON.stringify(data), { headers });
         } catch (err) {
-          return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
+          console.error("KV read error:", err);
+          return new Response(JSON.stringify({ error: "Failed to read data" }), { status: 500, headers });
         }
       }
       if (request.method === "PUT" || (request.method === "POST" && url.searchParams.has("key"))) {
+        const contentType = request.headers.get("Content-Type") || "";
+        const isBeacon = request.method === "POST" && url.searchParams.has("key");
+        if (!isBeacon && !contentType.includes("application/json")) {
+          return new Response(JSON.stringify({ error: "Content-Type must be application/json" }), { status: 415, headers });
+        }
+        const rawBody = await request.text();
+        if (rawBody.length > MAX_BODY_SIZE) {
+          return new Response(JSON.stringify({ error: "Request body too large" }), { status: 413, headers });
+        }
         try {
-          const body = await request.json();
+          const body = JSON.parse(rawBody);
           await env.INVENTORY_KV.put("inventory", JSON.stringify(body));
           return new Response(JSON.stringify({ ok: true }), { headers });
         } catch (err) {
-          return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
+          console.error("KV write error:", err);
+          return new Response(JSON.stringify({ error: "Failed to save data" }), { status: 500, headers });
         }
       }
       return new Response("Method not allowed", { status: 405, headers });
@@ -89,12 +130,31 @@ export default {
     if (request.method !== "POST") {
       return new Response("Method not allowed", { status: 405 });
     }
+    if (!checkRateLimit("ai:" + clientIP, RATE_LIMIT_MAX_AI)) {
+      return new Response(JSON.stringify({ error: "Too many requests" }), { status: 429, headers });
+    }
+    const aiContentType = request.headers.get("Content-Type") || "";
+    if (!aiContentType.includes("application/json")) {
+      return new Response(JSON.stringify({ error: "Content-Type must be application/json" }), { status: 415, headers });
+    }
     try {
       const { system, message, mode } = await request.json();
       if (!system || !message) {
         return new Response(
           JSON.stringify({ error: "Missing 'system' or 'message' field" }),
           { status: 400, headers }
+        );
+      }
+      if (typeof system !== "string" || typeof message !== "string") {
+        return new Response(
+          JSON.stringify({ error: "Fields 'system' and 'message' must be strings" }),
+          { status: 400, headers }
+        );
+      }
+      if (system.length + message.length > MAX_AI_INPUT_LENGTH) {
+        return new Response(
+          JSON.stringify({ error: "Input too long" }),
+          { status: 413, headers }
         );
       }
       const messages = [
@@ -118,8 +178,9 @@ export default {
       const text = result.response || (typeof result === "string" ? result : JSON.stringify(result));
       return new Response(JSON.stringify({ text }), { headers });
     } catch (err) {
+      console.error("AI proxy error:", err);
       return new Response(
-        JSON.stringify({ error: err.message }),
+        JSON.stringify({ error: "AI request failed" }),
         { status: 500, headers }
       );
     }
@@ -132,6 +193,9 @@ function corsHeaders(origin) {
     "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Max-Age": "86400",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
   };
 }
 
