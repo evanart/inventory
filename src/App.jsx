@@ -44,12 +44,12 @@ const DEFAULT_STRUCTURE = {
 };
 
 const TYPE_ICONS = { house: "🏠", floor: "🏗", room: "🚪", container: "📦", item: "📌" };
-const TYPE_COLORS = { house: "#1e293b", floor: "#475569", room: "#2563eb", container: "#7c3aed", item: "#059669" };
+const TYPE_COLORS = { house: "#111", floor: "#444", room: "#0e7490", container: "#155e75", item: "#0e7490" };
 const CATEGORIES = ["tools","cleaning","electronics","holiday","clothing","kitchen","bathroom","office","sports","crafts","baby","storage","misc"];
 const CAT_COLORS = {
   tools:"#f59e0b",cleaning:"#10b981",electronics:"#3b82f6",holiday:"#ef4444",
   clothing:"#8b5cf6",kitchen:"#f97316",bathroom:"#06b6d4",office:"#6366f1",
-  sports:"#22c55e",crafts:"#ec4899",baby:"#a78bfa",storage:"#78716c",misc:"#94a3b8"
+  sports:"#22c55e",crafts:"#ec4899",baby:"#a78bfa",storage:"#78716c",misc:"#999"
 };
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -408,14 +408,15 @@ function flushSave(data) {
 
 function Breadcrumb({ chain, onNavigate }) {
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center", marginBottom: 12, fontSize: 13 }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center", marginBottom: 14, fontSize: 13 }}>
       {chain.map((node, i) => (
         <span key={node.id} style={{ display: "flex", alignItems: "center", gap: 2 }}>
-          {i > 0 && <span style={{ color: "#cbd5e1", margin: "0 2px" }}>›</span>}
+          {i > 0 && <span style={{ color: "#ccc", margin: "0 3px" }}>›</span>}
           <button onClick={() => onNavigate(node.id)} style={{
-            background: i === chain.length - 1 ? "#e2e8f0" : "none", border: "none", cursor: "pointer",
-            padding: "3px 8px", borderRadius: 6, fontWeight: i === chain.length - 1 ? 700 : 500,
-            color: i === chain.length - 1 ? "#1e293b" : "#64748b", fontSize: 13,
+            background: i === chain.length - 1 ? "#111" : "none", border: "none", cursor: "pointer",
+            padding: "3px 10px", borderRadius: 4, fontWeight: i === chain.length - 1 ? 600 : 400,
+            color: i === chain.length - 1 ? "#fff" : "#666", fontSize: 13,
+            fontFamily: "'Rubik', sans-serif",
           }}>{TYPE_ICONS[node.type] || "📁"} {node.name}</button>
         </span>
       ))}
@@ -427,21 +428,22 @@ function ItemCard({ node, onDelete, onEdit, onMove }) {
   const cat = node.category || "misc";
   return (
     <div style={{
-      background: "#fff", borderRadius: 10, padding: "10px 14px",
-      border: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 10,
+      background: "#fff", borderRadius: 8, padding: "10px 14px",
+      border: "1px solid #e0e0e0", display: "flex", alignItems: "center", gap: 10,
     }}>
       <span style={{
-        background: CAT_COLORS[cat] || "#94a3b8", color: "#fff", fontSize: 9,
-        fontWeight: 700, borderRadius: 5, padding: "2px 6px", textTransform: "uppercase", flexShrink: 0,
+        background: CAT_COLORS[cat] || "#999", color: "#fff", fontSize: 9,
+        fontWeight: 700, borderRadius: 4, padding: "2px 7px", textTransform: "uppercase", flexShrink: 0,
+        fontFamily: "'Rubik', sans-serif", letterSpacing: "0.04em",
       }}>{cat}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ fontWeight: 600, fontSize: 14, color: "#1e293b", textTransform: "capitalize" }}>{node.name}</span>
-        {node.quantity != null && <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: 6 }}>×{node.quantity}</span>}
+        <span style={{ fontWeight: 600, fontSize: 14, color: "#111", textTransform: "capitalize" }}>{node.name}</span>
+        {node.quantity != null && <span style={{ fontSize: 12, color: "#999", marginLeft: 6 }}>×{node.quantity}</span>}
       </div>
       <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-        <button onClick={() => onEdit(node)} title="Edit" style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 14, padding: 4 }}>✏️</button>
-        <button onClick={() => onMove(node)} title="Move" style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 14, padding: 4 }}>📂</button>
-        <button onClick={() => onDelete(node.id)} title="Delete" style={{ background: "none", border: "none", cursor: "pointer", color: "#cbd5e1", fontSize: 14, padding: 4 }}>✕</button>
+        <button onClick={() => onEdit(node)} title="Edit" style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 14, padding: 4 }}>✏️</button>
+        <button onClick={() => onMove(node)} title="Move" style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 14, padding: 4 }}>📂</button>
+        <button onClick={() => onDelete(node.id)} title="Delete" style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 14, padding: 4 }}>✕</button>
       </div>
     </div>
   );
@@ -451,48 +453,50 @@ function LocationCard({ node, onClick, onRename, onDelete, onMove }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(node.name);
   const count = countItems(node);
-  const color = TYPE_COLORS[node.type] || "#64748b";
+  const color = TYPE_COLORS[node.type] || "#666";
   const isDeletable = node.type === "container" || node.type === "room" || node.type === "floor";
   const isMovable = node.type === "room" || node.type === "floor" || node.type === "container";
 
   if (editing) {
     return (
       <div style={{
-        background: "#fff", borderRadius: 10, padding: "10px 16px",
-        border: "1.5px solid " + color + "88", display: "flex", alignItems: "center", gap: 10,
+        background: "#fff", borderRadius: 8, padding: "10px 16px",
+        border: "2px solid #0e7490", display: "flex", alignItems: "center", gap: 10,
       }}>
         <div style={{
-          width: 40, height: 40, borderRadius: 10, background: color + "15",
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0,
+          width: 38, height: 38, borderRadius: 8, background: "#f5f5f5",
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0,
+          border: "1px solid #e0e0e0",
         }}>{TYPE_ICONS[node.type] || "📁"}</div>
         <input value={name} onChange={e => setName(e.target.value)} autoFocus
           onKeyDown={e => {
             if (e.key === "Enter" && name.trim()) { onRename(node.id, name.trim()); setEditing(false); }
             if (e.key === "Escape") { setName(node.name); setEditing(false); }
           }}
-          style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid #e2e8f0", fontSize: 14, fontWeight: 600, outline: "none" }}
+          style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 14, fontWeight: 600, outline: "none" }}
         />
         <button onClick={() => { if (name.trim()) { onRename(node.id, name.trim()); setEditing(false); } }}
           style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: color, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Save</button>
         <button onClick={() => { setName(node.name); setEditing(false); }}
-          style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 12, cursor: "pointer" }}>✕</button>
+          style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", color: "#666", fontSize: 12, cursor: "pointer" }}>✕</button>
       </div>
     );
   }
 
   return (
     <div style={{
-      background: "#fff", borderRadius: 10, padding: "12px 16px",
-      border: "1.5px solid " + (count > 0 ? color + "33" : "#e5e7eb"),
+      background: "#fff", borderRadius: 8, padding: "12px 16px",
+      border: count > 0 ? "2px solid #0e749033" : "1px solid #e0e0e0",
       cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
     }}>
       <div onClick={() => onClick(node.id)} style={{
-        width: 40, height: 40, borderRadius: 10, background: color + "15",
-        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0,
+        width: 38, height: 38, borderRadius: 8, background: "#f5f5f5",
+        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0,
+        border: "1px solid #e0e0e0",
       }}>{TYPE_ICONS[node.type] || "📁"}</div>
       <div onClick={() => onClick(node.id)} style={{ flex: 1 }}>
-        <div style={{ fontWeight: 600, fontSize: 14, color: "#1e293b" }}>{node.name}</div>
-        <div style={{ fontSize: 12, color: "#94a3b8" }}>
+        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 500, fontSize: 14, color: "#111" }}>{node.name}</div>
+        <div style={{ fontSize: 12, color: "#999" }}>
           {count > 0 ? count + " item" + (count !== 1 ? "s" : "") : "empty"}
           {(node.children || []).filter(c => c.type !== "item").length > 0 &&
             " · " + (node.children || []).filter(c => c.type !== "item").length + " sub-locations"}
@@ -500,16 +504,16 @@ function LocationCard({ node, onClick, onRename, onDelete, onMove }) {
       </div>
       <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
         <button onClick={(e) => { e.stopPropagation(); setEditing(true); }} title="Rename"
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 13, padding: 4 }}>✏️</button>
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 13, padding: 4 }}>✏️</button>
         {isMovable && (
           <button onClick={(e) => { e.stopPropagation(); onMove(node); }} title="Move"
-            style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 13, padding: 4 }}>📂</button>
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 13, padding: 4 }}>📂</button>
         )}
         {isDeletable && (
           <button onClick={(e) => { e.stopPropagation(); if (count > 0 && (node.type === "room" || node.type === "floor")) { if (confirm("This " + node.type + " contains " + count + " item(s). Delete anyway?")) onDelete(node.id); } else { onDelete(node.id); } }} title={"Delete " + node.type}
-            style={{ background: "none", border: "none", cursor: "pointer", color: "#cbd5e1", fontSize: 13, padding: 4 }}>✕</button>
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 13, padding: 4 }}>✕</button>
         )}
-        <div onClick={() => onClick(node.id)} style={{ color: "#cbd5e1", fontSize: 18, padding: "0 2px", cursor: "pointer" }}>›</div>
+        <div onClick={() => onClick(node.id)} style={{ color: "#ccc", fontSize: 18, padding: "0 2px", cursor: "pointer" }}>›</div>
       </div>
     </div>
   );
@@ -520,21 +524,21 @@ function EditItemModal({ item, onSave, onCancel }) {
   const [qty, setQty] = useState(item.quantity != null ? item.quantity : "");
   const [cat, setCat] = useState(item.category || "misc");
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
       onClick={onCancel}>
-      <div style={{ background: "#fff", borderRadius: 14, padding: 20, width: "100%", maxWidth: 360 }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 14 }}>Edit Item</div>
-        <label style={{ fontSize: 12, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 4 }}>Name</label>
-        <input value={name} onChange={e => setName(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 14, marginBottom: 10, boxSizing: "border-box" }} />
-        <label style={{ fontSize: 12, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 4 }}>Quantity</label>
-        <input value={qty} onChange={e => setQty(e.target.value)} type="number" min="0" placeholder="Unknown" style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 14, marginBottom: 10, boxSizing: "border-box" }} />
-        <label style={{ fontSize: 12, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 4 }}>Category</label>
-        <select value={cat} onChange={e => setCat(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 14, marginBottom: 16, boxSizing: "border-box" }}>
+      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 360 }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 14 }}>Edit Item</div>
+        <label style={{ fontSize: 12, fontWeight: 600, color: "#666", display: "block", marginBottom: 4 }}>Name</label>
+        <input value={name} onChange={e => setName(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, marginBottom: 10, boxSizing: "border-box" }} />
+        <label style={{ fontSize: 12, fontWeight: 600, color: "#666", display: "block", marginBottom: 4 }}>Quantity</label>
+        <input value={qty} onChange={e => setQty(e.target.value)} type="number" min="0" placeholder="Unknown" style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, marginBottom: 10, boxSizing: "border-box" }} />
+        <label style={{ fontSize: 12, fontWeight: 600, color: "#666", display: "block", marginBottom: 4 }}>Category</label>
+        <select value={cat} onChange={e => setCat(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, marginBottom: 16, boxSizing: "border-box" }}>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={onCancel} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-          <button onClick={() => onSave({ name: name.trim() || item.name, quantity: qty === "" ? null : Number(qty), category: cat })} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "none", background: "#2563eb", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Save</button>
+          <button onClick={onCancel} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+          <button onClick={() => onSave({ name: name.trim() || item.name, quantity: qty === "" ? null : Number(qty), category: cat })} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "none", background: "#0e7490", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Save</button>
         </div>
       </div>
     </div>
@@ -553,27 +557,27 @@ function MoveItemModal({ item, tree, onMove, onCancel }) {
   const chain = findParentChain(tree, item.id);
   const currentParentId = chain && chain.length >= 2 ? chain[chain.length - 2].id : null;
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
       onClick={onCancel}>
-      <div style={{ background: "#fff", borderRadius: 14, padding: 20, width: "100%", maxWidth: 400, maxHeight: "70vh", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Move "{item.name}"</div>
-        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>Select a new location</div>
-        <div style={{ flex: 1, overflow: "auto", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 400, maxHeight: "70vh", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Move "{item.name}"</div>
+        <div style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Select a new location</div>
+        <div style={{ flex: 1, overflow: "auto", borderRadius: 8, border: "1px solid #ddd" }}>
           {locations.filter(l => l.type !== "house").map(loc => (
             <button key={loc.id} onClick={() => { if (loc.id !== currentParentId) onMove(loc.id); }}
               disabled={loc.id === currentParentId}
               style={{
                 display: "block", width: "100%", textAlign: "left", padding: "8px 12px",
-                paddingLeft: 12 + (loc.depth - 1) * 16, border: "none", borderBottom: "1px solid #f1f5f9",
-                background: loc.id === currentParentId ? "#f0fdf4" : "#fff", cursor: loc.id === currentParentId ? "default" : "pointer",
-                fontSize: 13, color: loc.id === currentParentId ? "#059669" : "#334155",
+                paddingLeft: 12 + (loc.depth - 1) * 16, border: "none", borderBottom: "1px solid #f5f5f5",
+                background: loc.id === currentParentId ? "#e8f7fa" : "#fff", cursor: loc.id === currentParentId ? "default" : "pointer",
+                fontSize: 13, color: loc.id === currentParentId ? "#0e7490" : "#222",
                 fontWeight: loc.id === currentParentId ? 600 : 400,
               }}>
               {TYPE_ICONS[loc.type]} {loc.name} {loc.id === currentParentId && <span style={{ fontSize: 11 }}>(current)</span>}
             </button>
           ))}
         </div>
-        <button onClick={onCancel} style={{ marginTop: 12, padding: "9px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Cancel</button>
+        <button onClick={onCancel} style={{ marginTop: 12, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Cancel</button>
       </div>
     </div>
   );
@@ -582,16 +586,16 @@ function MoveItemModal({ item, tree, onMove, onCancel }) {
 function RenameModal({ node, onSave, onCancel }) {
   const [name, setName] = useState(node.name);
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
       onClick={onCancel}>
-      <div style={{ background: "#fff", borderRadius: 14, padding: 20, width: "100%", maxWidth: 340 }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 14 }}>Rename {node.type === "floor" ? "Floor" : node.type === "room" ? "Room" : "Container"}</div>
+      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 340 }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 14 }}>Rename {node.type === "floor" ? "Floor" : node.type === "room" ? "Room" : "Container"}</div>
         <input value={name} onChange={e => setName(e.target.value)} autoFocus
           onKeyDown={e => { if (e.key === "Enter" && name.trim()) onSave(name.trim()); if (e.key === "Escape") onCancel(); }}
-          style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 15, fontWeight: 600, marginBottom: 14, boxSizing: "border-box", outline: "none" }} />
+          style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #ddd", fontSize: 15, fontWeight: 600, marginBottom: 14, boxSizing: "border-box", outline: "none" }} />
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={onCancel} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-          <button onClick={() => { if (name.trim()) onSave(name.trim()); }} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "none", background: TYPE_COLORS[node.type] || "#2563eb", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Save</button>
+          <button onClick={onCancel} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+          <button onClick={() => { if (name.trim()) onSave(name.trim()); }} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "none", background: TYPE_COLORS[node.type] || "#0e7490", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Save</button>
         </div>
       </div>
     </div>
@@ -617,22 +621,22 @@ function MoveLocationModal({ node, tree, onMove, onCancel }) {
     return false;
   });
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
       onClick={onCancel}>
-      <div style={{ background: "#fff", borderRadius: 14, padding: 20, width: "100%", maxWidth: 400, maxHeight: "70vh", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Move "{node.name}"</div>
-        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>Select a new location</div>
-        <div style={{ flex: 1, overflow: "auto", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 400, maxHeight: "70vh", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Move "{node.name}"</div>
+        <div style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Select a new location</div>
+        <div style={{ flex: 1, overflow: "auto", borderRadius: 8, border: "1px solid #ddd" }}>
           {validDestinations.length === 0 ? (
-            <div style={{ padding: "12px", textAlign: "center", color: "#94a3b8", fontSize: 12 }}>No valid destinations</div>
+            <div style={{ padding: "12px", textAlign: "center", color: "#999", fontSize: 12 }}>No valid destinations</div>
           ) : (
             validDestinations.map(loc => (
               <button key={loc.id} onClick={() => onMove(loc.id)}
                 style={{
                   display: "block", width: "100%", textAlign: "left", padding: "8px 12px",
-                  paddingLeft: 12 + (loc.depth - 1) * 16, border: "none", borderBottom: "1px solid #f1f5f9",
+                  paddingLeft: 12 + (loc.depth - 1) * 16, border: "none", borderBottom: "1px solid #f5f5f5",
                   background: "#fff", cursor: "pointer",
-                  fontSize: 13, color: "#334155",
+                  fontSize: 13, color: "#222",
                   fontWeight: 400,
                 }}>
                 {TYPE_ICONS[loc.type]} {loc.name}
@@ -640,7 +644,7 @@ function MoveLocationModal({ node, tree, onMove, onCancel }) {
             ))
           )}
         </div>
-        <button onClick={onCancel} style={{ marginTop: 12, padding: "9px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Cancel</button>
+        <button onClick={onCancel} style={{ marginTop: 12, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Cancel</button>
       </div>
     </div>
   );
@@ -650,15 +654,15 @@ function QuickAddItem({ onAdd, onCancel }) {
   const [name, setName] = useState("");
   const [cat, setCat] = useState("misc");
   return (
-    <div style={{ background: "#fff", borderRadius: 10, padding: "10px 14px", border: "1px solid #e2e8f0", marginBottom: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+    <div style={{ background: "#fff", borderRadius: 10, padding: "10px 14px", border: "1px solid #ddd", marginBottom: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
       <input value={name} onChange={e => setName(e.target.value)} placeholder="Item name"
         onKeyDown={e => { if (e.key === "Enter" && name.trim()) onAdd(name.trim(), cat); }}
-        autoFocus style={{ flex: 1, minWidth: 120, padding: "6px 10px", borderRadius: 6, border: "1px solid #e2e8f0", fontSize: 13 }} />
-      <select value={cat} onChange={e => setCat(e.target.value)} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #e2e8f0", fontSize: 12 }}>
+        autoFocus style={{ flex: 1, minWidth: 120, padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13 }} />
+      <select value={cat} onChange={e => setCat(e.target.value)} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12 }}>
         {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
       </select>
-      <button onClick={() => { if (name.trim()) onAdd(name.trim(), cat); }} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#059669", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add</button>
-      <button onClick={onCancel} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 12, cursor: "pointer" }}>✕</button>
+      <button onClick={() => { if (name.trim()) onAdd(name.trim(), cat); }} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#0e7490", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add</button>
+      <button onClick={onCancel} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", color: "#666", fontSize: 12, cursor: "pointer" }}>✕</button>
     </div>
   );
 }
@@ -670,9 +674,9 @@ function AddContainerInline({ onAdd, onCancel }) {
       <input value={name} onChange={e => setName(e.target.value)}
         onKeyDown={e => { if (e.key === "Enter" && name.trim()) onAdd(name.trim()); }}
         placeholder="Container name (e.g. Wood Shelf, Red Box)" autoFocus
-        style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, outline: "none" }} />
-      <button onClick={() => { if (name.trim()) onAdd(name.trim()); }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#7c3aed", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Add</button>
-      <button onClick={onCancel} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+        style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd", fontSize: 13, outline: "none" }} />
+      <button onClick={() => { if (name.trim()) onAdd(name.trim()); }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#155e75", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Add</button>
+      <button onClick={onCancel} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontSize: 13, cursor: "pointer" }}>Cancel</button>
     </div>
   );
 }
@@ -689,32 +693,32 @@ function DuplicateSuggestionModal({ pendingStore, onResolve, onCancel }) {
     setChoices(prev => prev.map((c, i) => i === idx ? { action, targetId: targetId !== undefined ? targetId : c.targetId } : c));
   };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
       onClick={onCancel}>
-      <div style={{ background: "#fff", borderRadius: 14, padding: 20, width: "100%", maxWidth: 440, maxHeight: "80vh", display: "flex", flexDirection: "column", animation: "fadeIn .2s ease" }}
+      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 440, maxHeight: "80vh", display: "flex", flexDirection: "column", animation: "fadeIn .2s ease" }}
         onClick={e => e.stopPropagation()}>
-        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Similar Items Found</div>
-        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14 }}>These items may already exist in your inventory.</div>
+        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Similar Items Found</div>
+        <div style={{ fontSize: 12, color: "#999", marginBottom: 14 }}>These items may already exist in your inventory.</div>
         <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
           {itemsWithDupes.map(item => {
             const choice = choices[item.idx];
             return (
-              <div key={item.idx} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 4 }}>
+              <div key={item.idx} style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#111", marginBottom: 4 }}>
                   Storing "{item.name}"{item.quantity != null && " ×" + item.quantity} in {item.targetPath}
                 </div>
-                <div style={{ fontSize: 11, color: "#64748b", marginBottom: 6 }}>Found similar:</div>
+                <div style={{ fontSize: 11, color: "#666", marginBottom: 6 }}>Found similar:</div>
                 {item.duplicates.map(dup => (
                   <div key={dup.id} style={{
                     display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", marginBottom: 4,
-                    borderRadius: 6, background: choice.targetId === dup.id ? "#f0f4ff" : "#f8fafc",
-                    border: "1px solid " + (choice.targetId === dup.id ? "#bfdbfe" : "#f1f5f9"),
+                    borderRadius: 6, background: choice.targetId === dup.id ? "#e8f7fa" : "#fafafa",
+                    border: "1px solid " + (choice.targetId === dup.id ? "#a3d5de" : "#f5f5f5"),
                     cursor: "pointer", fontSize: 12,
                   }} onClick={() => setChoice(item.idx, choice.action, dup.id)}>
                     <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{dup.name}</span>
-                    {dup.quantity != null && <span style={{ color: "#94a3b8" }}>×{dup.quantity}</span>}
-                    <span style={{ color: "#94a3b8", fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dup.fullPath}</span>
-                    {choice.targetId === dup.id && <span style={{ color: "#2563eb", flexShrink: 0 }}>●</span>}
+                    {dup.quantity != null && <span style={{ color: "#999" }}>×{dup.quantity}</span>}
+                    <span style={{ color: "#999", fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dup.fullPath}</span>
+                    {choice.targetId === dup.id && <span style={{ color: "#0e7490", flexShrink: 0 }}>●</span>}
                   </div>
                 ))}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
@@ -727,11 +731,11 @@ function DuplicateSuggestionModal({ pendingStore, onResolve, onCancel }) {
                     <button key={opt.action} onClick={() => setChoice(item.idx, opt.action)}
                       style={{
                         padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer",
-                        border: choice.action === opt.action ? "none" : "1px solid #e2e8f0",
+                        border: choice.action === opt.action ? "none" : "1px solid #ddd",
                         background: choice.action === opt.action
-                          ? (opt.action === "skip" ? "#fee2e2" : "#2563eb") : "#fff",
+                          ? (opt.action === "skip" ? "#fee2e2" : "#0e7490") : "#fff",
                         color: choice.action === opt.action
-                          ? (opt.action === "skip" ? "#991b1b" : "#fff") : "#64748b",
+                          ? (opt.action === "skip" ? "#991b1b" : "#fff") : "#666",
                       }}>{opt.label}</button>
                   ))}
                 </div>
@@ -740,8 +744,8 @@ function DuplicateSuggestionModal({ pendingStore, onResolve, onCancel }) {
           })}
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-          <button onClick={onCancel} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-          <button onClick={() => onResolve(choices)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "none", background: "#2563eb", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Confirm</button>
+          <button onClick={onCancel} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+          <button onClick={() => onResolve(choices)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "none", background: "#0e7490", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Confirm</button>
         </div>
       </div>
     </div>
@@ -750,36 +754,36 @@ function DuplicateSuggestionModal({ pendingStore, onResolve, onCancel }) {
 
 function DuplicateScanModal({ groups, onMerge, onClose }) {
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
       onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 14, padding: 20, width: "100%", maxWidth: 440, maxHeight: "80vh", display: "flex", flexDirection: "column", animation: "fadeIn .2s ease" }}
+      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 440, maxHeight: "80vh", display: "flex", flexDirection: "column", animation: "fadeIn .2s ease" }}
         onClick={e => e.stopPropagation()}>
-        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Duplicate Scan</div>
-        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14 }}>
+        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Duplicate Scan</div>
+        <div style={{ fontSize: 12, color: "#999", marginBottom: 14 }}>
           {groups.length > 0 ? groups.length + " group" + (groups.length !== 1 ? "s" : "") + " of similar items found." : "No duplicate items found in your inventory."}
         </div>
         <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
           {groups.map((group, gIdx) => (
-            <div key={gIdx} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#1e293b", marginBottom: 6, textTransform: "capitalize" }}>
+            <div key={gIdx} style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#111", marginBottom: 6, textTransform: "capitalize" }}>
                 Similar: "{group[0].name}"
               </div>
               {group.map(item => (
                 <div key={item.id} style={{
                   display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", marginBottom: 3,
-                  borderRadius: 6, background: "#f8fafc", fontSize: 12,
+                  borderRadius: 6, background: "#fafafa", fontSize: 12,
                 }}>
                   <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{item.name}</span>
-                  {item.quantity != null && <span style={{ color: "#94a3b8" }}>×{item.quantity}</span>}
-                  <span style={{ color: "#94a3b8", fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.fullPath}</span>
+                  {item.quantity != null && <span style={{ color: "#999" }}>×{item.quantity}</span>}
+                  <span style={{ color: "#999", fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.fullPath}</span>
                   <button onClick={() => onMerge(group, item.id)} title="Merge all into this one"
-                    style={{ padding: "2px 8px", borderRadius: 4, border: "1px solid #e2e8f0", background: "#fff", color: "#2563eb", fontSize: 10, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>Keep</button>
+                    style={{ padding: "2px 8px", borderRadius: 4, border: "1px solid #ddd", background: "#fff", color: "#0e7490", fontSize: 10, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>Keep</button>
                 </div>
               ))}
             </div>
           ))}
         </div>
-        <button onClick={onClose} style={{ marginTop: 14, padding: "9px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Close</button>
+        <button onClick={onClose} style={{ marginTop: 14, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Close</button>
       </div>
     </div>
   );
@@ -1104,7 +1108,7 @@ export default function App() {
   const nlpAvailable = !!API_PROXY;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#f5f5f5", fontFamily: "'Catamaran',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}>
       {editingItem && <EditItemModal item={editingItem} onSave={handleEditSave} onCancel={() => setEditingItem(null)} />}
       {movingItem && <MoveItemModal item={movingItem} tree={tree} onMove={handleMoveItem} onCancel={() => setMovingItem(null)} />}
       {movingLocation && <MoveLocationModal node={movingLocation} tree={tree} onMove={handleMoveLocation} onCancel={() => setMovingLocation(null)} />}
@@ -1112,27 +1116,27 @@ export default function App() {
       {pendingStore && <DuplicateSuggestionModal pendingStore={pendingStore} onResolve={handleResolveDuplicates} onCancel={() => setPendingStore(null)} />}
       {duplicateScanResults && <DuplicateScanModal groups={duplicateScanResults} onMerge={handleMergeDuplicates} onClose={() => setDuplicateScanResults(null)} />}
 
-      <div style={{ background: "linear-gradient(135deg,#1e293b,#334155)", padding: "28px 16px 20px", color: "#fff" }}>
+      <div style={{ background: "#000", padding: "32px 16px 22px", color: "#fff" }}>
         <div style={{ maxWidth: 600, margin: "0 auto", position: "relative" }}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 24, fontWeight: 300, letterSpacing: "0.12em", textTransform: "uppercase" }}>Home Inventory</div>
-            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 6, fontStyle: "italic", letterSpacing: "0.05em", fontWeight: 300 }}>Everything in its right place</div>
-            <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{totalItems} items tracked</div>
+            <div style={{ fontFamily: "'Rubik', sans-serif", fontSize: 26, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>Home Inventory</div>
+            <div style={{ fontSize: 12, color: "#888", marginTop: 6, letterSpacing: "0.04em", fontWeight: 400 }}>Everything in its right place</div>
+            <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>{totalItems} items tracked</div>
           </div>
           <div style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 4, alignItems: "center" }}>
             {undoStack.length > 0 && (
               <button onClick={handleUndo} style={{
                 padding: "4px 8px", borderRadius: 6, border: "none",
-                background: "transparent", color: "#64748b", fontSize: 12, cursor: "pointer",
+                background: "transparent", color: "#666", fontSize: 12, cursor: "pointer",
                 transition: "color 0.2s",
-              }} onMouseEnter={e => e.target.style.color = "#e2e8f0"} onMouseLeave={e => e.target.style.color = "#64748b"}>↩</button>
+              }} onMouseEnter={e => e.target.style.color = "#ddd"} onMouseLeave={e => e.target.style.color = "#666"}>↩</button>
             )}
             <div style={{ position: "relative" }}>
               <button onClick={() => setShowDataMenu(!showDataMenu)} style={{
                 padding: "4px 8px", borderRadius: 6, border: "none",
-                background: "transparent", color: "#64748b", fontSize: 14, cursor: "pointer",
+                background: "transparent", color: "#666", fontSize: 14, cursor: "pointer",
                 transition: "color 0.2s",
-              }} onMouseEnter={e => e.target.style.color = "#e2e8f0"} onMouseLeave={e => e.target.style.color = "#64748b"}>⚙</button>
+              }} onMouseEnter={e => e.target.style.color = "#ddd"} onMouseLeave={e => e.target.style.color = "#666"}>⚙</button>
               {showDataMenu && (
                 <div style={{
                   position: "absolute", top: "100%", right: 0, marginTop: 6, background: "#fff",
@@ -1140,23 +1144,23 @@ export default function App() {
                 }}>
                   <button onClick={handleExportCSV} style={{
                     display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
-                    border: "none", borderBottom: "1px solid #f1f5f9", background: "#fff",
-                    fontSize: 13, color: "#334155", cursor: "pointer", fontWeight: 500,
+                    border: "none", borderBottom: "1px solid #f5f5f5", background: "#fff",
+                    fontSize: 13, color: "#222", cursor: "pointer", fontWeight: 500,
                   }}>📤 Export CSV</button>
                   <button onClick={handleImportCSV} style={{
                     display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
-                    border: "none", borderBottom: "1px solid #f1f5f9", background: "#fff",
-                    fontSize: 13, color: "#334155", cursor: "pointer", fontWeight: 500,
+                    border: "none", borderBottom: "1px solid #f5f5f5", background: "#fff",
+                    fontSize: 13, color: "#222", cursor: "pointer", fontWeight: 500,
                   }}>📥 Import CSV</button>
                   <button onClick={handleLoadSampleData} style={{
                     display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
-                    border: "none", borderBottom: "1px solid #f1f5f9", background: "#fff",
-                    fontSize: 13, color: "#334155", cursor: "pointer", fontWeight: 500,
+                    border: "none", borderBottom: "1px solid #f5f5f5", background: "#fff",
+                    fontSize: 13, color: "#222", cursor: "pointer", fontWeight: 500,
                   }}>📋 Load Sample Data</button>
                   <button onClick={handleDuplicateScan} style={{
                     display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
-                    border: "none", borderBottom: "1px solid #f1f5f9", background: "#fff",
-                    fontSize: 13, color: "#334155", cursor: "pointer", fontWeight: 500,
+                    border: "none", borderBottom: "1px solid #f5f5f5", background: "#fff",
+                    fontSize: 13, color: "#222", cursor: "pointer", fontWeight: 500,
                   }}>🔍 Find Duplicates</button>
                   <button onClick={handleClearAll} style={{
                     display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
@@ -1171,16 +1175,17 @@ export default function App() {
       </div>
 
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "14px 12px" }}>
-        <div style={{ display: "flex", borderRadius: 10, overflow: "hidden", border: "1px solid #e2e8f0", marginBottom: 12 }}>
-          {[["browse","🏠 Browse"],["store","📦 Store"],["search","🔍 Find"]].map(([m,l]) => {
+        <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: "2px solid #111", marginBottom: 14 }}>
+          {[["browse","Browse"],["store","Store"],["search","Find"]].map(([m,l]) => {
             const disabled = !nlpAvailable && m !== "browse";
             return (
               <button key={m} onClick={() => { if (!disabled) { setMode(m); setMessage(null); } }}
                 title={disabled ? "Set up Cloudflare Worker proxy to enable NLP" : ""}
                 style={{
-                  flex: 1, padding: "9px 0", border: "none", cursor: disabled ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 13,
-                  background: mode === m ? (m === "browse" ? "#0f172a" : m === "store" ? "#2563eb" : "#7c3aed") : "#fff",
-                  color: mode === m ? "#fff" : disabled ? "#cbd5e1" : "#64748b",
+                  flex: 1, padding: "10px 0", border: "none", cursor: disabled ? "not-allowed" : "pointer",
+                  fontWeight: 600, fontSize: 13, fontFamily: "'Rubik', sans-serif", letterSpacing: "0.03em",
+                  background: mode === m ? "#000" : "#fff",
+                  color: mode === m ? "#fff" : disabled ? "#ccc" : "#555",
                   opacity: disabled ? 0.6 : 1,
                 }}>{l}</button>
             );
@@ -1205,7 +1210,7 @@ export default function App() {
                   maxLength={MAX_INPUT_LENGTH}
                   rows={2}
                   style={{
-                    width: "100%", borderRadius: 10, border: "1px solid " + (speech.listening ? "#ef4444" : "#e2e8f0"),
+                    width: "100%", borderRadius: 10, border: "1px solid " + (speech.listening ? "#ef4444" : "#ddd"),
                     padding: "10px 12px", fontSize: 14, resize: "none",
                     fontFamily: "inherit", outline: "none", boxSizing: "border-box", transition: "border-color .2s",
                   }}
@@ -1218,7 +1223,7 @@ export default function App() {
                 <button onClick={speech.toggle} style={{
                   width: 44, height: 44, borderRadius: "50%", border: "none", cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                  background: speech.listening ? "#ef4444" : mode === "store" ? "#2563eb" : "#7c3aed",
+                  background: speech.listening ? "#ef4444" : "#0e7490",
                   animation: speech.listening ? "pulse 1.5s infinite" : "none",
                   marginBottom: speech.listening ? 18 : 0,
                 }}>
@@ -1231,10 +1236,11 @@ export default function App() {
             </div>
             {speech.error && <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 6, marginTop: speech.listening ? 10 : 0 }}>{speech.error}</div>}
             <button onClick={handleSubmit} disabled={loading || !input.trim()} style={{
-              width: "100%", padding: "10px", borderRadius: 10, border: "none",
-              fontWeight: 600, fontSize: 14, cursor: loading ? "wait" : "pointer",
-              background: loading ? "#94a3b8" : mode === "store" ? "#2563eb" : "#7c3aed",
-              color: "#fff", marginBottom: 12, marginTop: speech.listening ? 10 : 0,
+              width: "100%", padding: "11px", borderRadius: 8, border: "none",
+              fontWeight: 600, fontSize: 14, fontFamily: "'Rubik', sans-serif",
+              cursor: loading ? "wait" : "pointer",
+              background: loading ? "#999" : "#0e7490",
+              color: "#fff", marginBottom: 14, marginTop: speech.listening ? 10 : 0,
               opacity: !input.trim() && !loading ? 0.5 : 1,
             }}>{loading ? "Thinking..." : mode === "store" ? "Store" : "Search"}</button>
           </>
@@ -1244,9 +1250,9 @@ export default function App() {
           <div style={{
             padding: "10px 14px", borderRadius: 10, marginBottom: 12, fontSize: 13, lineHeight: 1.5,
             animation: "fadeIn .2s ease",
-            background: message.type === "error" ? "#fef2f2" : message.type === "info" ? "#f0f4ff" : "#f0fdf4",
-            color: message.type === "error" ? "#991b1b" : message.type === "info" ? "#1e40af" : "#166534",
-            border: "1px solid " + (message.type === "error" ? "#fecaca" : message.type === "info" ? "#bfdbfe" : "#bbf7d0"),
+            background: message.type === "error" ? "#fef2f2" : message.type === "info" ? "#e8f7fa" : "#e8f7fa",
+            color: message.type === "error" ? "#991b1b" : message.type === "info" ? "#0a5c6e" : "#0a5c6e",
+            border: "1px solid " + (message.type === "error" ? "#fecaca" : message.type === "info" ? "#a3d5de" : "#a3d5de"),
             whiteSpace: "pre-wrap",
           }}>{message.text}</div>
         )}
@@ -1254,26 +1260,26 @@ export default function App() {
         <Breadcrumb chain={breadcrumb} onNavigate={setCurrentId} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 18, fontWeight: 700, color: "#1e293b" }}>
+            <span style={{ fontFamily: "'Rubik', sans-serif", fontSize: 19, fontWeight: 600, color: "#111" }}>
               {TYPE_ICONS[currentNode.type]} {currentNode.name}
             </span>
             {canRename && (
               <button onClick={() => setRenamingLocation(currentNode)} title="Rename"
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 13, padding: "2px 4px" }}>✏️</button>
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 13, padding: "2px 4px" }}>✏️</button>
             )}
-            <span style={{ fontSize: 13, color: "#94a3b8" }}>
+            <span style={{ fontSize: 13, color: "#999" }}>
               {countItems(currentNode)} item{countItems(currentNode) !== 1 ? "s" : ""}
             </span>
           </div>
           {canAddItems && (
             <div style={{ display: "flex", gap: 6 }}>
               <button onClick={() => setAddingItem(true)} style={{
-                padding: "5px 12px", borderRadius: 8, border: "1px solid #e2e8f0",
-                background: "#fff", color: "#059669", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                padding: "5px 12px", borderRadius: 6, border: "2px solid #0e7490",
+                background: "#fff", color: "#0e7490", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'Rubik', sans-serif",
               }}>+ Item</button>
               <button onClick={() => setAdding(true)} style={{
-                padding: "5px 12px", borderRadius: 8, border: "1px solid #e2e8f0",
-                background: "#fff", color: "#7c3aed", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                padding: "5px 12px", borderRadius: 6, border: "2px solid #111",
+                background: "#fff", color: "#111", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'Rubik', sans-serif",
               }}>+ Container</button>
             </div>
           )}
@@ -1291,7 +1297,7 @@ export default function App() {
 
         {items.length > 0 && (
           <>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, margin: "12px 0 6px" }}>Items here</div>
+            <div style={{ fontFamily: "'Rubik', sans-serif", fontSize: 11, fontWeight: 500, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", margin: "14px 0 8px" }}>Items here</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               {items.map(i => <ItemCard key={i.id} node={i} onDelete={handleDelete} onEdit={setEditingItem} onMove={setMovingItem} />)}
             </div>
@@ -1299,7 +1305,7 @@ export default function App() {
         )}
 
         {containers.length === 0 && items.length === 0 && (
-          <div style={{ textAlign: "center", color: "#94a3b8", padding: "30px 16px", fontSize: 14 }}>
+          <div style={{ textAlign: "center", color: "#999", padding: "30px 16px", fontSize: 14 }}>
             {currentNode.type === "house"
               ? "Tap a floor to explore your house"
               : "Nothing here yet. Store items or add a container."}
