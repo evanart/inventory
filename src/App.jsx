@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 const STORAGE_KEY = "home-inventory-v2";
 const API_PROXY = import.meta.env.VITE_API_PROXY_URL || "";
 const API_KEY = import.meta.env.VITE_API_KEY || "";
+const MAX_INPUT_LENGTH = 500;
 
 const DEFAULT_STRUCTURE = {
   id: "house", name: "House", type: "house", children: [
@@ -682,6 +683,10 @@ export default function App() {
   const handleSubmit = useCallback(async () => {
     const text = inputRef.current.trim();
     if (!text) return;
+    if (text.length > MAX_INPUT_LENGTH) {
+      setMessage({ type: "error", text: "Input too long (max " + MAX_INPUT_LENGTH + " characters)." });
+      return;
+    }
     setLoading(true); setMessage(null);
     try {
       if (modeRef.current === "search") {
@@ -950,6 +955,7 @@ export default function App() {
                   placeholder={mode === "store"
                     ? 'e.g. "Spare lightbulbs on the wood shelf in the garage"'
                     : 'e.g. "Do I have any lightbulbs?"'}
+                  maxLength={MAX_INPUT_LENGTH}
                   rows={2}
                   style={{
                     width: "100%", borderRadius: 10, border: "1px solid " + (speech.listening ? "#ef4444" : "#e2e8f0"),

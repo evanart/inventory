@@ -254,27 +254,52 @@ Then update the `VITE_API_KEY` GitHub Actions secret and push to `main` to redep
    - Easy key rotation without code redeployment
    - Setup: See [Deployment](#-deployment) section
 
+2. **Strict CORS Origin Validation** ✓ - Exact origin match when `ALLOWED_ORIGIN` is set
+   - Defaults to `*` (permissive) but exact-match comparison when configured
+   - Set `ALLOWED_ORIGIN` to your frontend URL in wrangler environment
+
+3. **Rate Limiting** ✓ - Per-IP request throttling
+   - AI endpoint: 30 requests/minute per IP
+   - Data endpoint: 60 requests/minute per IP
+   - In-memory tracking with automatic cleanup
+
+4. **Request Size Limits** ✓ - Prevents payload abuse
+   - Data endpoint: 5MB max body size
+   - AI endpoint: 10,000 character combined input limit
+   - Frontend: 500 character max for user input
+
+5. **Security Headers** ✓ - Defense-in-depth response headers
+   - `X-Content-Type-Options: nosniff`
+   - `X-Frame-Options: DENY`
+   - `Referrer-Policy: strict-origin-when-cross-origin`
+
+6. **Input Validation** ✓ - Type checking and Content-Type enforcement
+   - POST/PUT requests must send `application/json` Content-Type
+   - AI fields validated as strings before processing
+   - Sanitized error messages (no internal details leaked to clients)
+
 ### ⚠️ Remaining Security Concerns
 
-1. **CORS Still Permissive** - Defaults to allow all origins (`*`)
+1. **CORS Default is Permissive** - Defaults to `*` if `ALLOWED_ORIGIN` is not set
    - Mitigation: API key requirement prevents unauthenticated access
-   - Workaround: Set `ALLOWED_ORIGIN` in wrangler environment
+   - Fix: Set `ALLOWED_ORIGIN` to your production frontend URL
 
-2. **No Rate Limiting** - AI calls are unmetered
-   - Risk: Cost abuse, DoS attacks
-   - Planned: Add rate limiting by API key
-
-3. **Data Sync Conflicts** - Multiple browser tabs can overwrite each other
+2. **Data Sync Conflicts** - Multiple browser tabs can overwrite each other
    - Workaround: Avoid editing same inventory in multiple tabs simultaneously
    - Planned: Implement conflict resolution with last-write-wins or collaborative editing
 
-4. **Prompt Injection** - User input sent to AI system prompt
-   - Mitigation: AI runs on Cloudflare infrastructure, limited risk
+3. **Prompt Injection** - User input sent to AI system prompt
+   - Mitigation: AI runs on Cloudflare infrastructure, limited risk; input length limited
    - Planned: Additional input validation and escaping
+
+4. **API Key in Client Bundle** - `VITE_API_KEY` is embedded in the frontend JS
+   - Mitigation: Key is required but the app is intended for personal/household use
+   - Risk: Anyone who views source can extract the key
 
 ### Best Practices
 
 - **Keep API_KEY secret** - Never commit to git or share publicly
+- **Set ALLOWED_ORIGIN** - Configure to your production frontend URL
 - **Rotate keys regularly** - Use `wrangler secret put API_KEY --env production` and update the `VITE_API_KEY` GitHub secret
 - **Back up your inventory** regularly using the CSV Export feature
 - **Review AI output** - check that parsed items are correct before storing
