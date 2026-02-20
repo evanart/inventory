@@ -438,7 +438,7 @@ function flushSave(data) {
 
 function Breadcrumb({ chain, onNavigate }) {
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center", marginBottom: 14, fontSize: 13 }}>
+    <div data-component="Breadcrumb" style={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center", marginBottom: 14, fontSize: 13 }}>
       {chain.map((node, i) => (
         <span key={node.id} style={{ display: "flex", alignItems: "center", gap: 2 }}>
           {i > 0 && <ChevronRight size={12} color="#ccc" style={{ margin: "0 1px" }} />}
@@ -457,7 +457,7 @@ function Breadcrumb({ chain, onNavigate }) {
 function ItemCard({ node, onDelete, onEdit, onMove }) {
   const cat = node.category || "misc";
   return (
-    <div style={{
+    <div data-component="ItemCard" style={{
       background: "#fff", borderRadius: 8, padding: "10px 14px",
       border: "1px solid #f0f0f0", display: "flex", alignItems: "center", gap: 10,
     }}>
@@ -489,7 +489,7 @@ function LocationCard({ node, onClick, onRename, onDelete, onMove }) {
 
   if (editing) {
     return (
-      <div style={{
+      <div data-component="LocationCard" style={{
         background: "#fff", borderRadius: 8, padding: "10px 16px",
         border: "2px solid #0e7490", display: "flex", alignItems: "center", gap: 10,
       }}>
@@ -514,7 +514,7 @@ function LocationCard({ node, onClick, onRename, onDelete, onMove }) {
   }
 
   return (
-    <div style={{
+    <div data-component="LocationCard" style={{
       background: "#fff", borderRadius: 8, padding: "12px 16px",
       border: "1px solid #f0f0f0",
       cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
@@ -554,7 +554,7 @@ function EditItemModal({ item, onSave, onCancel }) {
   const [qty, setQty] = useState(item.quantity != null ? item.quantity : "");
   const [cat, setCat] = useState(item.category || "misc");
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
+    <div data-component="EditItemModal" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 360 }}>
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 14 }}>Edit Item</div>
         <label style={{ fontSize: 12, fontWeight: 600, color: "#666", display: "block", marginBottom: 4 }}>Name</label>
@@ -586,7 +586,7 @@ function MoveItemModal({ item, tree, onMove, onCancel }) {
   const chain = findParentChain(tree, item.id);
   const currentParentId = chain && chain.length >= 2 ? chain[chain.length - 2].id : null;
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
+    <div data-component="MoveItemModal" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 400, maxHeight: "70vh", display: "flex", flexDirection: "column" }}>
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Move "{item.name}"</div>
         <div style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Select a new location</div>
@@ -614,7 +614,7 @@ function MoveItemModal({ item, tree, onMove, onCancel }) {
 function RenameModal({ node, onSave, onCancel }) {
   const [name, setName] = useState(node.name);
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
+    <div data-component="RenameModal" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 340 }}>
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 14 }}>Rename {node.type === "floor" ? "Floor" : node.type === "room" ? "Room" : "Container"}</div>
         <input value={name} onChange={e => setName(e.target.value)} autoFocus
@@ -648,7 +648,7 @@ function MoveLocationModal({ node, tree, onMove, onCancel }) {
     return false;
   });
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
+    <div data-component="MoveLocationModal" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 400, maxHeight: "70vh", display: "flex", flexDirection: "column" }}>
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Move "{node.name}"</div>
         <div style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Select a new location</div>
@@ -680,7 +680,7 @@ function QuickAddItem({ onAdd, onCancel }) {
   const [name, setName] = useState("");
   const [cat, setCat] = useState("misc");
   return (
-    <div style={{ background: "#fff", borderRadius: 10, padding: "10px 14px", border: "1px solid #ddd", marginBottom: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+    <div data-component="QuickAddItem" style={{ background: "#fff", borderRadius: 10, padding: "10px 14px", border: "1px solid #ddd", marginBottom: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
       <input value={name} onChange={e => setName(e.target.value)} placeholder="Item name"
         onKeyDown={e => { if (e.key === "Enter" && name.trim()) onAdd(name.trim(), cat); }}
         autoFocus style={{ flex: 1, minWidth: 120, padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13 }} />
@@ -696,7 +696,7 @@ function QuickAddItem({ onAdd, onCancel }) {
 function AddContainerInline({ onAdd, onCancel }) {
   const [name, setName] = useState("");
   return (
-    <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+    <div data-component="AddContainerInline" style={{ display: "flex", gap: 6, marginBottom: 8 }}>
       <input value={name} onChange={e => setName(e.target.value)}
         onKeyDown={e => { if (e.key === "Enter" && name.trim()) onAdd(name.trim()); }}
         placeholder="Container name (e.g. Wood Shelf, Red Box)" autoFocus
@@ -719,7 +719,7 @@ function DuplicateSuggestionModal({ pendingStore, onResolve, onCancel }) {
     setChoices(prev => prev.map((c, i) => i === idx ? { action, targetId: targetId !== undefined ? targetId : c.targetId } : c));
   };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
+    <div data-component="DuplicateSuggestionModal" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 440, maxHeight: "80vh", display: "flex", flexDirection: "column", animation: "fadeIn .2s ease" }}
        >
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Similar Items Found</div>
@@ -779,7 +779,7 @@ function DuplicateSuggestionModal({ pendingStore, onResolve, onCancel }) {
 
 function DuplicateScanModal({ groups, onMerge, onClose }) {
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
+    <div data-component="DuplicateScanModal" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 440, maxHeight: "80vh", display: "flex", flexDirection: "column", animation: "fadeIn .2s ease" }}
        >
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Duplicate Scan</div>
@@ -1197,7 +1197,7 @@ export default function App() {
   const nlpAvailable = !!API_PROXY;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#fafafa", fontFamily: "'Catamaran',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}>
+    <div data-component="App" style={{ minHeight: "100vh", background: "#fafafa", fontFamily: "'Catamaran',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}>
       {editingItem && <EditItemModal item={editingItem} onSave={handleEditSave} onCancel={() => setEditingItem(null)} />}
       {movingItem && <MoveItemModal item={movingItem} tree={tree} onMove={handleMoveItem} onCancel={() => setMovingItem(null)} />}
       {movingLocation && <MoveLocationModal node={movingLocation} tree={tree} onMove={handleMoveLocation} onCancel={() => setMovingLocation(null)} />}
