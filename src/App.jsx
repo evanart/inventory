@@ -294,7 +294,7 @@ function importCSVToTree(csvText) {
   return { tree, count, errors };
 }
 
-async function apiCall(systemPrompt, userMessage, mode) {
+async function apiCall(systemPrompt, userMessage, mode, signal) {
   if (!API_PROXY) throw new Error("API proxy not configured. Set VITE_API_PROXY_URL.");
   const headers = { "Content-Type": "application/json" };
   if (API_KEY) {
@@ -304,6 +304,7 @@ async function apiCall(systemPrompt, userMessage, mode) {
     method: "POST",
     headers,
     body: JSON.stringify({ system: systemPrompt, message: userMessage, mode }),
+    signal,
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
@@ -316,7 +317,7 @@ async function apiCall(systemPrompt, userMessage, mode) {
   return data.text;
 }
 
-async function processWithAI(text, tree) {
+async function processWithAI(text, tree, signal) {
   const allNodes = [];
   function walk(n, path) {
     allNodes.push({ path: path.join(" > "), type: n.type, name: n.name });
@@ -338,7 +339,7 @@ async function processWithAI(text, tree) {
 
   const systemPrompt = "You are a home inventory assistant. Determine if the user wants to STORE items, REMOVE items, or SEARCH/FIND items.\n\nCurrent house structure:\n" + structureSummary + "\n\nCurrent items in inventory:\n" + (itemSummary || "(empty)") + "\n\nReturn ONLY valid JSON with one of these formats:\n\nFor STORE:\n{\n  \"action\": \"store\",\n  \"items\": [{\"name\": \"item name (singular lowercase)\", \"quantity\": number or null, \"path\": [\"Floor Name\", \"Room Name\", \"Container (optional)\"], \"category\": one of: " + CATEGORIES.join(", ") + "}],\n  \"createLocations\": [{\"name\": \"location name\", \"type\": \"floor\" | \"room\", \"parentPath\": [\"Floor Name\"] or []}]\n}\n\nFor REMOVE:\n{\n  \"action\": \"remove\",\n  \"items\": [{\"name\": \"item name\", \"quantity\": null, \"path\": [], \"category\": \"misc\"}]\n}\n\nFor SEARCH/FIND:\n{\n  \"action\": \"search\",\n  \"searchResult\": \"Your helpful concise plain text answer about the items\"\n}\n\nRules:\n- Questions like \"where is...\", \"do I have...\", \"find my...\", \"how many...\" are SEARCH\n- Statements like \"put...\", \"store...\", \"add...\", \"I bought...\", \"there are...\" are STORE\n- Statements like \"remove...\", \"delete...\", \"I threw away...\", \"get rid of...\" are REMOVE\n- path = array from floor to most specific container\n- Match existing locations when clearly the same\n- New containers are created automatically in the path\n- If user mentions a room or floor that doesn't exist, add it to createLocations\n- quantity null = unknown amount\n- \"the garage\" -> [\"Main Floor\", \"Garage\"]\n- \"wood shelf in the garage\" -> [\"Main Floor\", \"Garage\", \"Wood Shelf\"]\n- For search: give a concise, helpful answer based on the inventory data. If nothing matches, say so.";
 
-  const raw = await apiCall(systemPrompt, text, "parse");
+  const raw = await apiCall(systemPrompt, text, "parse", signal);
   if (typeof raw === "object" && raw !== null) return raw;
   return JSON.parse(String(raw).replace(/```json|```/g, "").trim());
 }
@@ -348,17 +349,28 @@ function useSpeech() {
   const [transcript, setTranscript] = useState("");
   const [supported, setSupported] = useState(false);
   const [error, setError] = useState(null);
+  const [settled, setSettled] = useState(false);
   const ref = useRef(null);
   const retryCount = useRef(0);
+  const settleTimer = useRef(null);
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SR) {
       setSupported(true);
       const r = new SR();
-      r.continuous = false; r.interimResults = true; r.lang = "en-US";
-      r.onresult = e => { setError(null); retryCount.current = 0; setTranscript(Array.from(e.results).map(x => x[0].transcript).join("")); };
-      r.onend = () => setListening(false);
+      r.continuous = true; r.interimResults = true; r.lang = "en-US";
+      r.onresult = e => {
+        setError(null); retryCount.current = 0;
+        setTranscript(Array.from(e.results).map(x => x[0].transcript).join(""));
+        clearTimeout(settleTimer.current);
+        const allFinal = Array.from(e.results).every(r => r.isFinal);
+        if (allFinal) {
+          settleTimer.current = setTimeout(() => { setSettled(true); r.stop(); }, 2000);
+        }
+      };
+      r.onend = () => { clearTimeout(settleTimer.current); setListening(false); };
       r.onerror = (e) => {
+        clearTimeout(settleTimer.current);
         if (e.error === "no-speech" && retryCount.current < 2) { retryCount.current++; setTimeout(() => { try { r.start(); setListening(true); } catch(ex) {} }, 300); return; }
         setListening(false);
         if (e.error !== "aborted") setError(e.error === "no-speech" ? "No speech detected. Tap to try again." : "Mic error: " + e.error);
@@ -369,10 +381,11 @@ function useSpeech() {
   const toggle = useCallback(() => {
     if (!ref.current) return;
     setError(null); retryCount.current = 0;
-    if (listening) ref.current.stop();
-    else { setTranscript(""); try { ref.current.start(); setListening(true); } catch(ex) { setError("Couldn't start mic."); } }
+    clearTimeout(settleTimer.current);
+    if (listening) { setSettled(true); ref.current.stop(); }
+    else { setTranscript(""); setSettled(false); try { ref.current.start(); setListening(true); } catch(ex) { setError("Couldn't start mic."); } }
   }, [listening]);
-  return { listening, transcript, setTranscript, supported, toggle, error };
+  return { listening, transcript, setTranscript, supported, toggle, error, settled, setSettled };
 }
 
 function loadDataLocal() {
@@ -541,9 +554,8 @@ function EditItemModal({ item, onSave, onCancel }) {
   const [qty, setQty] = useState(item.quantity != null ? item.quantity : "");
   const [cat, setCat] = useState(item.category || "misc");
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
-      onClick={onCancel}>
-      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 360 }} onClick={e => e.stopPropagation()}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 360 }}>
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 14 }}>Edit Item</div>
         <label style={{ fontSize: 12, fontWeight: 600, color: "#666", display: "block", marginBottom: 4 }}>Name</label>
         <input value={name} onChange={e => setName(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, marginBottom: 10, boxSizing: "border-box" }} />
@@ -574,9 +586,8 @@ function MoveItemModal({ item, tree, onMove, onCancel }) {
   const chain = findParentChain(tree, item.id);
   const currentParentId = chain && chain.length >= 2 ? chain[chain.length - 2].id : null;
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
-      onClick={onCancel}>
-      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 400, maxHeight: "70vh", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 400, maxHeight: "70vh", display: "flex", flexDirection: "column" }}>
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Move "{item.name}"</div>
         <div style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Select a new location</div>
         <div style={{ flex: 1, overflow: "auto", borderRadius: 8, border: "1px solid #ddd" }}>
@@ -603,9 +614,8 @@ function MoveItemModal({ item, tree, onMove, onCancel }) {
 function RenameModal({ node, onSave, onCancel }) {
   const [name, setName] = useState(node.name);
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
-      onClick={onCancel}>
-      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 340 }} onClick={e => e.stopPropagation()}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 340 }}>
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 14 }}>Rename {node.type === "floor" ? "Floor" : node.type === "room" ? "Room" : "Container"}</div>
         <input value={name} onChange={e => setName(e.target.value)} autoFocus
           onKeyDown={e => { if (e.key === "Enter" && name.trim()) onSave(name.trim()); if (e.key === "Escape") onCancel(); }}
@@ -638,9 +648,8 @@ function MoveLocationModal({ node, tree, onMove, onCancel }) {
     return false;
   });
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
-      onClick={onCancel}>
-      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 400, maxHeight: "70vh", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 400, maxHeight: "70vh", display: "flex", flexDirection: "column" }}>
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Move "{node.name}"</div>
         <div style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Select a new location</div>
         <div style={{ flex: 1, overflow: "auto", borderRadius: 8, border: "1px solid #ddd" }}>
@@ -710,10 +719,9 @@ function DuplicateSuggestionModal({ pendingStore, onResolve, onCancel }) {
     setChoices(prev => prev.map((c, i) => i === idx ? { action, targetId: targetId !== undefined ? targetId : c.targetId } : c));
   };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
-      onClick={onCancel}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 440, maxHeight: "80vh", display: "flex", flexDirection: "column", animation: "fadeIn .2s ease" }}
-        onClick={e => e.stopPropagation()}>
+       >
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Similar Items Found</div>
         <div style={{ fontSize: 12, color: "#999", marginBottom: 14 }}>These items may already exist in your inventory.</div>
         <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
@@ -771,10 +779,9 @@ function DuplicateSuggestionModal({ pendingStore, onResolve, onCancel }) {
 
 function DuplicateScanModal({ groups, onMerge, onClose }) {
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
-      onClick={onClose}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 440, maxHeight: "80vh", display: "flex", flexDirection: "column", animation: "fadeIn .2s ease" }}
-        onClick={e => e.stopPropagation()}>
+       >
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Duplicate Scan</div>
         <div style={{ fontSize: 12, color: "#999", marginBottom: 14 }}>
           {groups.length > 0 ? groups.length + " group" + (groups.length !== 1 ? "s" : "") + " of similar items found." : "No duplicate items found in your inventory."}
@@ -918,6 +925,12 @@ export default function App() {
   }, [tree]);
   useEffect(() => { if (speech.transcript) setInput(speech.transcript); }, [speech.transcript]);
 
+  const abortRef = useRef(null);
+
+  const handleCancel = useCallback(() => {
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+  }, []);
+
   const handleSubmit = useCallback(async () => {
     const text = inputRef.current.trim();
     if (!text) return;
@@ -925,9 +938,12 @@ export default function App() {
       setMessage({ type: "error", text: "Input too long (max " + MAX_INPUT_LENGTH + " characters)." });
       return;
     }
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true); setMessage(null);
     try {
-      const parsed = await processWithAI(text, treeRef.current);
+      const parsed = await processWithAI(text, treeRef.current, controller.signal);
 
       if (parsed.action === "search") {
         setMessage({ type: "search", text: parsed.searchResult || "No results found." });
@@ -981,9 +997,11 @@ export default function App() {
         }
       }
     } catch (e) {
+      if (e.name === "AbortError") { setLoading(false); return; }
       console.error(e);
       setMessage({ type: "error", text: e.message || "Something went wrong. Try again." });
     }
+    abortRef.current = null;
     setInput(""); speech.setTranscript(""); setLoading(false);
   }, [speech]);
 
@@ -1051,11 +1069,12 @@ export default function App() {
     setMessage({ type: "success", text: 'Merged ' + group.length + ' items into "' + keep.name + '"' });
   };
 
-  const prevListening = useRef(false);
   useEffect(() => {
-    if (prevListening.current && !speech.listening && inputRef.current.trim()) handleSubmit();
-    prevListening.current = speech.listening;
-  }, [speech.listening, handleSubmit]);
+    if (speech.settled && inputRef.current.trim()) {
+      speech.setSettled(false);
+      handleSubmit();
+    }
+  }, [speech.settled, handleSubmit]);
 
   const handleDelete = (id) => {
     setUndoStack(prev => [...prev.slice(-9), { tree, label: "delete" }]);
@@ -1320,6 +1339,11 @@ export default function App() {
                 animation: "shimmer 1.5s ease-in-out infinite",
               }} />
             </div>
+            <button onClick={handleCancel} style={{
+              padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd",
+              background: "#fff", color: "#666", fontSize: 12, fontWeight: 600,
+              cursor: "pointer", flexShrink: 0,
+            }}>Cancel</button>
           </div>
         )}
 
