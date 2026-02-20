@@ -25,7 +25,7 @@ textarea:focus {
 }
 
 button:focus-visible {
-  outline: 2px solid #0e7490;
+  outline: 1px solid #0e7490;
   outline-offset: 2px;
 }
 
@@ -47,4 +47,14 @@ button:focus-visible {
 @keyframes slideOut {
   from { opacity: 1; transform: translateY(0); }
   to { opacity: 0; transform: translateY(-8px); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }

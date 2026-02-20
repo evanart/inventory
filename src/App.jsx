@@ -4,7 +4,7 @@ import {
   Pencil, FolderOpen, Trash2, Mic, MicOff,
   Upload, Download, ClipboardList, Search,
   Undo2, Settings, X, ChevronRight, Send,
-  Check, AlertCircle, Info,
+  Check, AlertCircle, Info, Loader2,
 } from "lucide-react";
 
 const STORAGE_KEY = "home-inventory-v2";
@@ -339,7 +339,8 @@ async function processWithAI(text, tree) {
   const systemPrompt = "You are a home inventory assistant. Determine if the user wants to STORE items, REMOVE items, or SEARCH/FIND items.\n\nCurrent house structure:\n" + structureSummary + "\n\nCurrent items in inventory:\n" + (itemSummary || "(empty)") + "\n\nReturn ONLY valid JSON with one of these formats:\n\nFor STORE:\n{\n  \"action\": \"store\",\n  \"items\": [{\"name\": \"item name (singular lowercase)\", \"quantity\": number or null, \"path\": [\"Floor Name\", \"Room Name\", \"Container (optional)\"], \"category\": one of: " + CATEGORIES.join(", ") + "}],\n  \"createLocations\": [{\"name\": \"location name\", \"type\": \"floor\" | \"room\", \"parentPath\": [\"Floor Name\"] or []}]\n}\n\nFor REMOVE:\n{\n  \"action\": \"remove\",\n  \"items\": [{\"name\": \"item name\", \"quantity\": null, \"path\": [], \"category\": \"misc\"}]\n}\n\nFor SEARCH/FIND:\n{\n  \"action\": \"search\",\n  \"searchResult\": \"Your helpful concise plain text answer about the items\"\n}\n\nRules:\n- Questions like \"where is...\", \"do I have...\", \"find my...\", \"how many...\" are SEARCH\n- Statements like \"put...\", \"store...\", \"add...\", \"I bought...\", \"there are...\" are STORE\n- Statements like \"remove...\", \"delete...\", \"I threw away...\", \"get rid of...\" are REMOVE\n- path = array from floor to most specific container\n- Match existing locations when clearly the same\n- New containers are created automatically in the path\n- If user mentions a room or floor that doesn't exist, add it to createLocations\n- quantity null = unknown amount\n- \"the garage\" -> [\"Main Floor\", \"Garage\"]\n- \"wood shelf in the garage\" -> [\"Main Floor\", \"Garage\", \"Wood Shelf\"]\n- For search: give a concise, helpful answer based on the inventory data. If nothing matches, say so.";
 
   const raw = await apiCall(systemPrompt, text, "parse");
-  return JSON.parse(raw.replace(/```json|```/g, "").trim());
+  if (typeof raw === "object" && raw !== null) return raw;
+  return JSON.parse(String(raw).replace(/```json|```/g, "").trim());
 }
 
 function useSpeech() {
@@ -1245,7 +1246,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 600, margin: "0 auto", padding: "14px 12px" }}>
+      <div style={{ maxWidth: 600, margin: "0 auto", padding: "14px 0" }}>
         {nlpAvailable && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
@@ -1297,6 +1298,28 @@ export default function App() {
         {!nlpAvailable && totalItems === 0 && (
           <div style={{ padding: "10px 14px", borderRadius: 10, marginBottom: 12, fontSize: 12, lineHeight: 1.5, background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }}>
             AI features require a Cloudflare Worker proxy. Manual add and browse work without it. Load sample data from the settings menu to explore.
+          </div>
+        )}
+
+        {loading && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10, padding: "14px 16px",
+            borderRadius: 12, marginBottom: 16, background: "#fff",
+            border: "1px solid #e0e0e0", animation: "fadeIn .2s ease",
+          }}>
+            <Loader2 size={18} color="#0e7490" style={{ animation: "spin 1s linear infinite" }} />
+            <span style={{ fontSize: 14, color: "#555", fontWeight: 500 }}>Thinking...</span>
+            <div style={{
+              flex: 1, height: 4, borderRadius: 2, overflow: "hidden",
+              background: "#f0f0f0",
+            }}>
+              <div style={{
+                width: "100%", height: "100%", borderRadius: 2,
+                background: "linear-gradient(90deg, #f0f0f0 0%, #0e7490 50%, #f0f0f0 100%)",
+                backgroundSize: "200% 100%",
+                animation: "shimmer 1.5s ease-in-out infinite",
+              }} />
+            </div>
           </div>
         )}
 
