@@ -1,4 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Home, Building2, DoorOpen, Package, MapPin,
+  Pencil, FolderOpen, Trash2, Mic, MicOff,
+  Upload, Download, ClipboardList, Search,
+  Undo2, Settings, X, ChevronRight, Send,
+  Check, AlertCircle, Info,
+} from "lucide-react";
 
 const STORAGE_KEY = "home-inventory-v2";
 const API_PROXY = import.meta.env.VITE_API_PROXY_URL || "";
@@ -43,7 +50,7 @@ const DEFAULT_STRUCTURE = {
   ]
 };
 
-const TYPE_ICONS = { house: "🏠", floor: "🏗", room: "🚪", container: "📦", item: "📌" };
+const TYPE_ICON_COMPONENTS = { house: Home, floor: Building2, room: DoorOpen, container: Package, item: MapPin };
 const TYPE_COLORS = { house: "#111", floor: "#444", room: "#0e7490", container: "#155e75", item: "#0e7490" };
 const CATEGORIES = ["tools","cleaning","electronics","holiday","clothing","kitchen","bathroom","office","sports","crafts","baby","storage","misc"];
 const CAT_COLORS = {
@@ -51,6 +58,11 @@ const CAT_COLORS = {
   clothing:"#8b5cf6",kitchen:"#f97316",bathroom:"#06b6d4",office:"#6366f1",
   sports:"#22c55e",crafts:"#ec4899",baby:"#a78bfa",storage:"#78716c",misc:"#999"
 };
+
+function TypeIcon({ type, size = 18, color }) {
+  const Icon = TYPE_ICON_COMPONENTS[type] || Package;
+  return <Icon size={size} color={color || TYPE_COLORS[type] || "#666"} />;
+}
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function countItems(n) { return n.type === "item" ? 1 : (n.children || []).reduce((s, c) => s + countItems(c), 0); }
@@ -304,26 +316,30 @@ async function apiCall(systemPrompt, userMessage, mode) {
   return data.text;
 }
 
-async function parseWithClaude(text, tree) {
+async function processWithAI(text, tree) {
   const allNodes = [];
   function walk(n, path) {
     allNodes.push({ path: path.join(" > "), type: n.type, name: n.name });
     (n.children || []).forEach(c => walk(c, [...path, c.name]));
   }
   walk(tree, [tree.name]);
-  const summary = allNodes.filter(n => n.type !== "item").map(n => n.path).join("\n");
-  const systemPrompt = "You extract item storage info from natural language and place it in a house hierarchy.\n\nCurrent structure:\n" + summary + "\n\nReturn ONLY valid JSON:\n{\n  \"action\": \"store\" | \"remove\",\n  \"items\": [{\n    \"name\": \"item name (singular lowercase)\",\n    \"quantity\": number or null,\n    \"path\": [\"Floor Name\", \"Room Name\", \"Container (optional)\", \"Sub-container (optional)\"],\n    \"category\": one of: " + CATEGORIES.join(", ") + "\n  }],\n  \"createLocations\": [{\"name\": \"location name\", \"type\": \"floor\" | \"room\", \"parentPath\": [\"Floor Name\"] or []}]\n}\n\nRules:\n- path = array from floor to most specific container\n- Match existing locations when clearly the same\n- New containers are created automatically in the path\n- If user mentions a room or floor that doesn't exist, add it to createLocations\n- quantity null = unknown amount\n- \"the garage\" -> [\"Main Floor\", \"Garage\"]\n- \"wood shelf in the garage\" -> [\"Main Floor\", \"Garage\", \"Wood Shelf\"]\n- If user says \"store X in the guest bedroom on the main floor\", and guest bedroom doesn't exist, add {\"name\": \"Guest Bedroom\", \"type\": \"room\", \"parentPath\": [\"Main Floor\"]} to createLocations";
-  const raw = await apiCall(systemPrompt, text, "parse");
-  return JSON.parse(raw.replace(/```json|```/g, "").trim());
-}
+  const structureSummary = allNodes.filter(n => n.type !== "item").map(n => n.path).join("\n");
 
-async function searchWithClaude(query, tree) {
   const allItems = flattenItems(tree).map(item => {
     const chain = findParentChain(tree, item.id);
-    return { ...item, fullPath: chain ? chain.map(n => n.name).join(" > ") : item.name };
+    return { name: item.name, quantity: item.quantity, category: item.category, fullPath: chain ? chain.map(n => n.name).join(" > ") : item.name };
   });
-  const systemPrompt = "You help find items in a home inventory. Given a query and item list with full paths, return a helpful concise plain text answer. If nothing matches, say so.";
-  return await apiCall(systemPrompt, "Items:\n" + JSON.stringify(allItems) + "\n\nQuery: \"" + query + "\"", "search");
+  let itemSummary = allItems.map(i =>
+    i.name + (i.quantity != null ? " x" + i.quantity : "") + " (" + i.category + ") — " + i.fullPath
+  ).join("\n");
+  if (itemSummary.length > 3500) {
+    itemSummary = itemSummary.substring(0, 3500) + "\n... (" + allItems.length + " total items)";
+  }
+
+  const systemPrompt = "You are a home inventory assistant. Determine if the user wants to STORE items, REMOVE items, or SEARCH/FIND items.\n\nCurrent house structure:\n" + structureSummary + "\n\nCurrent items in inventory:\n" + (itemSummary || "(empty)") + "\n\nReturn ONLY valid JSON with one of these formats:\n\nFor STORE:\n{\n  \"action\": \"store\",\n  \"items\": [{\"name\": \"item name (singular lowercase)\", \"quantity\": number or null, \"path\": [\"Floor Name\", \"Room Name\", \"Container (optional)\"], \"category\": one of: " + CATEGORIES.join(", ") + "}],\n  \"createLocations\": [{\"name\": \"location name\", \"type\": \"floor\" | \"room\", \"parentPath\": [\"Floor Name\"] or []}]\n}\n\nFor REMOVE:\n{\n  \"action\": \"remove\",\n  \"items\": [{\"name\": \"item name\", \"quantity\": null, \"path\": [], \"category\": \"misc\"}]\n}\n\nFor SEARCH/FIND:\n{\n  \"action\": \"search\",\n  \"searchResult\": \"Your helpful concise plain text answer about the items\"\n}\n\nRules:\n- Questions like \"where is...\", \"do I have...\", \"find my...\", \"how many...\" are SEARCH\n- Statements like \"put...\", \"store...\", \"add...\", \"I bought...\", \"there are...\" are STORE\n- Statements like \"remove...\", \"delete...\", \"I threw away...\", \"get rid of...\" are REMOVE\n- path = array from floor to most specific container\n- Match existing locations when clearly the same\n- New containers are created automatically in the path\n- If user mentions a room or floor that doesn't exist, add it to createLocations\n- quantity null = unknown amount\n- \"the garage\" -> [\"Main Floor\", \"Garage\"]\n- \"wood shelf in the garage\" -> [\"Main Floor\", \"Garage\", \"Wood Shelf\"]\n- For search: give a concise, helpful answer based on the inventory data. If nothing matches, say so.";
+
+  const raw = await apiCall(systemPrompt, text, "parse");
+  return JSON.parse(raw.replace(/```json|```/g, "").trim());
 }
 
 function useSpeech() {
@@ -411,13 +427,13 @@ function Breadcrumb({ chain, onNavigate }) {
     <div style={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center", marginBottom: 14, fontSize: 13 }}>
       {chain.map((node, i) => (
         <span key={node.id} style={{ display: "flex", alignItems: "center", gap: 2 }}>
-          {i > 0 && <span style={{ color: "#ccc", margin: "0 3px" }}>›</span>}
+          {i > 0 && <ChevronRight size={12} color="#ccc" style={{ margin: "0 1px" }} />}
           <button onClick={() => onNavigate(node.id)} style={{
             background: i === chain.length - 1 ? "#111" : "none", border: "none", cursor: "pointer",
             padding: "3px 10px", borderRadius: 4, fontWeight: i === chain.length - 1 ? 600 : 400,
             color: i === chain.length - 1 ? "#fff" : "#666", fontSize: 13,
-            fontFamily: "'Rubik', sans-serif",
-          }}>{TYPE_ICONS[node.type] || "📁"} {node.name}</button>
+            fontFamily: "'Rubik', sans-serif", display: "flex", alignItems: "center", gap: 4,
+          }}><TypeIcon type={node.type} size={13} color={i === chain.length - 1 ? "#fff" : undefined} /> {node.name}</button>
         </span>
       ))}
     </div>
@@ -429,7 +445,7 @@ function ItemCard({ node, onDelete, onEdit, onMove }) {
   return (
     <div style={{
       background: "#fff", borderRadius: 8, padding: "10px 14px",
-      border: "1px solid #e0e0e0", display: "flex", alignItems: "center", gap: 10,
+      border: "1px solid #f0f0f0", display: "flex", alignItems: "center", gap: 10,
     }}>
       <span style={{
         background: CAT_COLORS[cat] || "#999", color: "#fff", fontSize: 9,
@@ -438,12 +454,12 @@ function ItemCard({ node, onDelete, onEdit, onMove }) {
       }}>{cat}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{ fontWeight: 600, fontSize: 14, color: "#111", textTransform: "capitalize" }}>{node.name}</span>
-        {node.quantity != null && <span style={{ fontSize: 12, color: "#999", marginLeft: 6 }}>×{node.quantity}</span>}
+        {node.quantity != null && <span style={{ fontSize: 12, color: "#999", marginLeft: 6 }}>{"\u00D7"}{node.quantity}</span>}
       </div>
       <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-        <button onClick={() => onEdit(node)} title="Edit" style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 14, padding: 4 }}>✏️</button>
-        <button onClick={() => onMove(node)} title="Move" style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 14, padding: 4 }}>📂</button>
-        <button onClick={() => onDelete(node.id)} title="Delete" style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 14, padding: 4 }}>✕</button>
+        <button onClick={() => onEdit(node)} title="Edit" style={{ background: "none", border: "none", cursor: "pointer", color: "#999", padding: 4, display: "flex", alignItems: "center" }}><Pencil size={14} /></button>
+        <button onClick={() => onMove(node)} title="Move" style={{ background: "none", border: "none", cursor: "pointer", color: "#999", padding: 4, display: "flex", alignItems: "center" }}><FolderOpen size={14} /></button>
+        <button onClick={() => onDelete(node.id)} title="Delete" style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", padding: 4, display: "flex", alignItems: "center" }}><X size={14} /></button>
       </div>
     </div>
   );
@@ -465,9 +481,9 @@ function LocationCard({ node, onClick, onRename, onDelete, onMove }) {
       }}>
         <div style={{
           width: 38, height: 38, borderRadius: 8, background: "#f5f5f5",
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           border: "1px solid #e0e0e0",
-        }}>{TYPE_ICONS[node.type] || "📁"}</div>
+        }}><TypeIcon type={node.type} size={18} /></div>
         <input value={name} onChange={e => setName(e.target.value)} autoFocus
           onKeyDown={e => {
             if (e.key === "Enter" && name.trim()) { onRename(node.id, name.trim()); setEditing(false); }
@@ -478,7 +494,7 @@ function LocationCard({ node, onClick, onRename, onDelete, onMove }) {
         <button onClick={() => { if (name.trim()) { onRename(node.id, name.trim()); setEditing(false); } }}
           style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: color, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Save</button>
         <button onClick={() => { setName(node.name); setEditing(false); }}
-          style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", color: "#666", fontSize: 12, cursor: "pointer" }}>✕</button>
+          style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", color: "#666", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center" }}><X size={14} /></button>
       </div>
     );
   }
@@ -486,34 +502,34 @@ function LocationCard({ node, onClick, onRename, onDelete, onMove }) {
   return (
     <div style={{
       background: "#fff", borderRadius: 8, padding: "12px 16px",
-      border: count > 0 ? "2px solid #0e749033" : "1px solid #e0e0e0",
+      border: "1px solid #f0f0f0",
       cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
     }}>
       <div onClick={() => onClick(node.id)} style={{
         width: 38, height: 38, borderRadius: 8, background: "#f5f5f5",
-        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0,
+        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
         border: "1px solid #e0e0e0",
-      }}>{TYPE_ICONS[node.type] || "📁"}</div>
+      }}><TypeIcon type={node.type} size={18} /></div>
       <div onClick={() => onClick(node.id)} style={{ flex: 1 }}>
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 500, fontSize: 14, color: "#111" }}>{node.name}</div>
         <div style={{ fontSize: 12, color: "#999" }}>
           {count > 0 ? count + " item" + (count !== 1 ? "s" : "") : "empty"}
           {(node.children || []).filter(c => c.type !== "item").length > 0 &&
-            " · " + (node.children || []).filter(c => c.type !== "item").length + " sub-locations"}
+            " \u00B7 " + (node.children || []).filter(c => c.type !== "item").length + " sub-locations"}
         </div>
       </div>
       <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
         <button onClick={(e) => { e.stopPropagation(); setEditing(true); }} title="Rename"
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 13, padding: 4 }}>✏️</button>
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#999", padding: 4, display: "flex", alignItems: "center" }}><Pencil size={14} /></button>
         {isMovable && (
           <button onClick={(e) => { e.stopPropagation(); onMove(node); }} title="Move"
-            style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 13, padding: 4 }}>📂</button>
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#999", padding: 4, display: "flex", alignItems: "center" }}><FolderOpen size={14} /></button>
         )}
         {isDeletable && (
           <button onClick={(e) => { e.stopPropagation(); if (count > 0 && (node.type === "room" || node.type === "floor")) { if (confirm("This " + node.type + " contains " + count + " item(s). Delete anyway?")) onDelete(node.id); } else { onDelete(node.id); } }} title={"Delete " + node.type}
-            style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 13, padding: 4 }}>✕</button>
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", padding: 4, display: "flex", alignItems: "center" }}><X size={14} /></button>
         )}
-        <div onClick={() => onClick(node.id)} style={{ color: "#ccc", fontSize: 18, padding: "0 2px", cursor: "pointer" }}>›</div>
+        <div onClick={() => onClick(node.id)} style={{ color: "#ccc", padding: "0 2px", cursor: "pointer", display: "flex", alignItems: "center" }}><ChevronRight size={18} /></div>
       </div>
     </div>
   );
@@ -567,13 +583,13 @@ function MoveItemModal({ item, tree, onMove, onCancel }) {
             <button key={loc.id} onClick={() => { if (loc.id !== currentParentId) onMove(loc.id); }}
               disabled={loc.id === currentParentId}
               style={{
-                display: "block", width: "100%", textAlign: "left", padding: "8px 12px",
+                display: "flex", alignItems: "center", gap: 6, width: "100%", textAlign: "left", padding: "8px 12px",
                 paddingLeft: 12 + (loc.depth - 1) * 16, border: "none", borderBottom: "1px solid #f5f5f5",
                 background: loc.id === currentParentId ? "#e8f7fa" : "#fff", cursor: loc.id === currentParentId ? "default" : "pointer",
                 fontSize: 13, color: loc.id === currentParentId ? "#0e7490" : "#222",
                 fontWeight: loc.id === currentParentId ? 600 : 400,
               }}>
-              {TYPE_ICONS[loc.type]} {loc.name} {loc.id === currentParentId && <span style={{ fontSize: 11 }}>(current)</span>}
+              <TypeIcon type={loc.type} size={14} /> {loc.name} {loc.id === currentParentId && <span style={{ fontSize: 11 }}>(current)</span>}
             </button>
           ))}
         </div>
@@ -633,13 +649,13 @@ function MoveLocationModal({ node, tree, onMove, onCancel }) {
             validDestinations.map(loc => (
               <button key={loc.id} onClick={() => onMove(loc.id)}
                 style={{
-                  display: "block", width: "100%", textAlign: "left", padding: "8px 12px",
+                  display: "flex", alignItems: "center", gap: 6, width: "100%", textAlign: "left", padding: "8px 12px",
                   paddingLeft: 12 + (loc.depth - 1) * 16, border: "none", borderBottom: "1px solid #f5f5f5",
                   background: "#fff", cursor: "pointer",
                   fontSize: 13, color: "#222",
                   fontWeight: 400,
                 }}>
-                {TYPE_ICONS[loc.type]} {loc.name}
+                <TypeIcon type={loc.type} size={14} /> {loc.name}
               </button>
             ))
           )}
@@ -662,7 +678,7 @@ function QuickAddItem({ onAdd, onCancel }) {
         {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
       </select>
       <button onClick={() => { if (name.trim()) onAdd(name.trim(), cat); }} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#0e7490", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add</button>
-      <button onClick={onCancel} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", color: "#666", fontSize: 12, cursor: "pointer" }}>✕</button>
+      <button onClick={onCancel} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", color: "#666", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center" }}><X size={14} /></button>
     </div>
   );
 }
@@ -705,7 +721,7 @@ function DuplicateSuggestionModal({ pendingStore, onResolve, onCancel }) {
             return (
               <div key={item.idx} style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#111", marginBottom: 4 }}>
-                  Storing "{item.name}"{item.quantity != null && " ×" + item.quantity} in {item.targetPath}
+                  Storing "{item.name}"{item.quantity != null && " \u00D7" + item.quantity} in {item.targetPath}
                 </div>
                 <div style={{ fontSize: 11, color: "#666", marginBottom: 6 }}>Found similar:</div>
                 {item.duplicates.map(dup => (
@@ -716,9 +732,9 @@ function DuplicateSuggestionModal({ pendingStore, onResolve, onCancel }) {
                     cursor: "pointer", fontSize: 12,
                   }} onClick={() => setChoice(item.idx, choice.action, dup.id)}>
                     <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{dup.name}</span>
-                    {dup.quantity != null && <span style={{ color: "#999" }}>×{dup.quantity}</span>}
+                    {dup.quantity != null && <span style={{ color: "#999" }}>{"\u00D7"}{dup.quantity}</span>}
                     <span style={{ color: "#999", fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dup.fullPath}</span>
-                    {choice.targetId === dup.id && <span style={{ color: "#0e7490", flexShrink: 0 }}>●</span>}
+                    {choice.targetId === dup.id && <span style={{ color: "#0e7490", flexShrink: 0 }}>{"\u25CF"}</span>}
                   </div>
                 ))}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
@@ -774,7 +790,7 @@ function DuplicateScanModal({ groups, onMerge, onClose }) {
                   borderRadius: 6, background: "#fafafa", fontSize: 12,
                 }}>
                   <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{item.name}</span>
-                  {item.quantity != null && <span style={{ color: "#999" }}>×{item.quantity}</span>}
+                  {item.quantity != null && <span style={{ color: "#999" }}>{"\u00D7"}{item.quantity}</span>}
                   <span style={{ color: "#999", fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.fullPath}</span>
                   <button onClick={() => onMerge(group, item.id)} title="Merge all into this one"
                     style={{ padding: "2px 8px", borderRadius: 4, border: "1px solid #ddd", background: "#fff", color: "#0e7490", fontSize: 10, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>Keep</button>
@@ -789,10 +805,68 @@ function DuplicateScanModal({ groups, onMerge, onClose }) {
   );
 }
 
+function ResultCard({ message, onDismiss }) {
+  const [visible, setVisible] = useState(true);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    setVisible(true);
+    timerRef.current = setTimeout(() => setVisible(false), 8000);
+    return () => clearTimeout(timerRef.current);
+  }, [message]);
+
+  useEffect(() => {
+    if (!visible) {
+      const fadeTimer = setTimeout(onDismiss, 300);
+      return () => clearTimeout(fadeTimer);
+    }
+  }, [visible, onDismiss]);
+
+  if (!message) return null;
+
+  const iconMap = { search: Search, success: Check, error: AlertCircle, info: Info };
+  const IconComponent = iconMap[message.type] || Info;
+  const bgMap = { search: "#f0f9ff", success: "#f0fdf4", error: "#fef2f2", info: "#f0f9ff" };
+  const borderMap = { search: "#0e7490", success: "#16a34a", error: "#dc2626", info: "#0e7490" };
+  const labelMap = { search: "Search Result", success: "Done", error: "Error", info: "Info" };
+
+  return (
+    <div style={{
+      padding: "16px 18px", borderRadius: 12, marginBottom: 16,
+      background: bgMap[message.type] || bgMap.info,
+      borderLeft: "4px solid " + (borderMap[message.type] || borderMap.info),
+      display: "flex", alignItems: "flex-start", gap: 12,
+      animation: visible ? "slideIn .3s ease" : "slideOut .3s ease forwards",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+    }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: (borderMap[message.type] || borderMap.info) + "15",
+      }}>
+        <IconComponent size={18} color={borderMap[message.type] || borderMap.info} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 3, textTransform: "uppercase", letterSpacing: "0.05em", fontFamily: "'Rubik', sans-serif" }}>
+          {labelMap[message.type] || "Info"}
+        </div>
+        <div style={{ fontSize: 14, color: "#222", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+          {message.text}
+        </div>
+      </div>
+      <button onClick={() => setVisible(false)} style={{
+        background: "none", border: "none", cursor: "pointer", padding: 4, flexShrink: 0,
+        color: "#999", display: "flex", alignItems: "center",
+      }}>
+        <X size={16} />
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const [tree, setTree] = useState(DEFAULT_STRUCTURE);
   const [currentId, setCurrentId] = useState("house");
-  const [mode, setMode] = useState("browse");
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
@@ -812,14 +886,11 @@ export default function App() {
   const fileInputRef = useRef(null);
   const treeRef = useRef(tree);
   const inputRef = useRef(input);
-  const modeRef = useRef(mode);
   useEffect(() => { treeRef.current = tree; }, [tree]);
   useEffect(() => { inputRef.current = input; }, [input]);
-  useEffect(() => { modeRef.current = mode; }, [mode]);
 
   useEffect(() => {
     let cancelled = false;
-    // Show local data immediately, then replace with server data
     const local = loadDataLocal();
     if (local) setTree(local);
     loadDataFromServer().then(d => {
@@ -855,59 +926,57 @@ export default function App() {
     }
     setLoading(true); setMessage(null);
     try {
-      if (modeRef.current === "search") {
-        const ans = await searchWithClaude(text, treeRef.current);
-        setMessage({ type: "info", text: ans });
+      const parsed = await processWithAI(text, treeRef.current);
+
+      if (parsed.action === "search") {
+        setMessage({ type: "search", text: parsed.searchResult || "No results found." });
+      } else if (parsed.action === "remove") {
+        setUndoStack(prev => [...prev.slice(-9), { tree: treeRef.current, label: "remove" }]);
+        let updated = treeRef.current;
+        for (const item of (parsed.items || [])) {
+          const all = flattenItems(updated);
+          const match = all.find(n => n.name === item.name);
+          if (match) updated = removeFromTree(updated, match.id);
+        }
+        setTree(updated);
+        setMessage({ type: "success", text: "Removed: " + (parsed.items || []).map(i => i.name).join(", ") });
       } else {
-        const parsed = await parseWithClaude(text, treeRef.current);
-        if (parsed.action === "remove") {
-          setUndoStack(prev => [...prev.slice(-9), { tree: treeRef.current, label: "remove" }]);
-          let updated = treeRef.current;
-          for (const item of parsed.items) {
-            const all = flattenItems(updated);
-            const match = all.find(n => n.name === item.name);
-            if (match) updated = removeFromTree(updated, match.id);
+        let updated = treeRef.current;
+        if (parsed.createLocations && parsed.createLocations.length > 0) {
+          for (const loc of parsed.createLocations) {
+            updated = findOrCreateLocation(updated, loc.name, loc.type, loc.parentPath);
           }
-          setTree(updated);
-          setMessage({ type: "success", text: "Removed: " + parsed.items.map(i => i.name).join(", ") });
+        }
+        const preparedItems = [];
+        let tempTree = updated;
+        let hasDuplicates = false;
+        for (const item of (parsed.items || [])) {
+          const pathNames = item.path || [];
+          const types = pathNames.map((_, i) => i === 0 ? "floor" : i === 1 ? "room" : "container");
+          const { tree: t, leafId } = findOrCreatePath(tempTree, pathNames, types);
+          tempTree = t;
+          const chain = findParentChain(tempTree, leafId);
+          const targetPath = chain ? chain.map(n => n.name).join(" > ") : pathNames.join(" > ");
+          const duplicates = findSimilarItems(tempTree, item.name);
+          if (duplicates.length > 0) hasDuplicates = true;
+          preparedItems.push({ ...item, leafId, targetPath, duplicates });
+        }
+        if (hasDuplicates) {
+          setPendingStore({ items: preparedItems, treeWithPaths: tempTree, undoTree: treeRef.current });
         } else {
-          let updated = treeRef.current;
-          if (parsed.createLocations && parsed.createLocations.length > 0) {
-            for (const loc of parsed.createLocations) {
-              updated = findOrCreateLocation(updated, loc.name, loc.type, loc.parentPath);
-            }
+          setUndoStack(prev => [...prev.slice(-9), { tree: treeRef.current, label: "store" }]);
+          const stored = [];
+          for (const item of preparedItems) {
+            const parent = findNode(tempTree, item.leafId);
+            const existing = (parent.children || []).find(c => c.type === "item" && c.name === item.name);
+            if (existing) tempTree = removeFromTree(tempTree, existing.id);
+            const itemNode = { id: uid(), name: item.name, type: "item", quantity: item.quantity, category: item.category || "misc", children: [] };
+            tempTree = addToTree(tempTree, item.leafId, itemNode);
+            const ch = findParentChain(tempTree, itemNode.id);
+            stored.push(ch ? ch.map(n => n.name).join(" > ") : item.name);
           }
-          const preparedItems = [];
-          let tempTree = updated;
-          let hasDuplicates = false;
-          for (const item of parsed.items) {
-            const pathNames = item.path || [];
-            const types = pathNames.map((_, i) => i === 0 ? "floor" : i === 1 ? "room" : "container");
-            const { tree: t, leafId } = findOrCreatePath(tempTree, pathNames, types);
-            tempTree = t;
-            const chain = findParentChain(tempTree, leafId);
-            const targetPath = chain ? chain.map(n => n.name).join(" > ") : pathNames.join(" > ");
-            const duplicates = findSimilarItems(tempTree, item.name);
-            if (duplicates.length > 0) hasDuplicates = true;
-            preparedItems.push({ ...item, leafId, targetPath, duplicates });
-          }
-          if (hasDuplicates) {
-            setPendingStore({ items: preparedItems, treeWithPaths: tempTree, undoTree: treeRef.current });
-          } else {
-            setUndoStack(prev => [...prev.slice(-9), { tree: treeRef.current, label: "store" }]);
-            const stored = [];
-            for (const item of preparedItems) {
-              const parent = findNode(tempTree, item.leafId);
-              const existing = (parent.children || []).find(c => c.type === "item" && c.name === item.name);
-              if (existing) tempTree = removeFromTree(tempTree, existing.id);
-              const itemNode = { id: uid(), name: item.name, type: "item", quantity: item.quantity, category: item.category || "misc", children: [] };
-              tempTree = addToTree(tempTree, item.leafId, itemNode);
-              const ch = findParentChain(tempTree, itemNode.id);
-              stored.push(ch ? ch.map(n => n.name).join(" > ") : item.name);
-            }
-            setTree(tempTree);
-            setMessage({ type: "success", text: "Stored: " + stored.join("; ") });
-          }
+          setTree(tempTree);
+          setMessage({ type: "success", text: "Stored: " + stored.join("; ") });
         }
       }
     } catch (e) {
@@ -1084,7 +1153,7 @@ export default function App() {
         setTree(newTree);
         flushSave(newTree);
         setCurrentId("house");
-        setMessage({ type: "success", text: "Loaded sample data — " + count + " items across your house." });
+        setMessage({ type: "success", text: "Loaded sample data \u2014 " + count + " items across your house." });
       })
       .catch(err => { setMessage({ type: "error", text: "Failed to load sample data: " + err.message }); });
   };
@@ -1108,7 +1177,7 @@ export default function App() {
   const nlpAvailable = !!API_PROXY;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f5f5f5", fontFamily: "'Catamaran',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#fafafa", fontFamily: "'Catamaran',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}>
       {editingItem && <EditItemModal item={editingItem} onSave={handleEditSave} onCancel={() => setEditingItem(null)} />}
       {movingItem && <MoveItemModal item={movingItem} tree={tree} onMove={handleMoveItem} onCancel={() => setMovingItem(null)} />}
       {movingLocation && <MoveLocationModal node={movingLocation} tree={tree} onMove={handleMoveLocation} onCancel={() => setMovingLocation(null)} />}
@@ -1116,57 +1185,59 @@ export default function App() {
       {pendingStore && <DuplicateSuggestionModal pendingStore={pendingStore} onResolve={handleResolveDuplicates} onCancel={() => setPendingStore(null)} />}
       {duplicateScanResults && <DuplicateScanModal groups={duplicateScanResults} onMerge={handleMergeDuplicates} onClose={() => setDuplicateScanResults(null)} />}
 
-      <div style={{ background: "#000", padding: "32px 16px 22px", color: "#fff" }}>
-        <div style={{ maxWidth: 600, margin: "0 auto", position: "relative" }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontFamily: "'Rubik', sans-serif", fontSize: 26, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>Home Inventory</div>
-            <div style={{ fontSize: 12, color: "#888", marginTop: 6, letterSpacing: "0.04em", fontWeight: 400 }}>Everything in its right place</div>
-            <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>{totalItems} items tracked</div>
+      <div style={{ background: "#fff", padding: "16px 16px 14px", borderBottom: "1px solid #e0e0e0" }}>
+        <div style={{ maxWidth: 600, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Home size={22} color="#0e7490" />
+            <div>
+              <div style={{ fontFamily: "'Rubik', sans-serif", fontSize: 18, fontWeight: 600, color: "#111", letterSpacing: "0.02em" }}>Home Inventory</div>
+              <div style={{ fontSize: 11, color: "#999" }}>{totalItems} items tracked</div>
+            </div>
           </div>
-          <div style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 4, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {undoStack.length > 0 && (
-              <button onClick={handleUndo} style={{
-                padding: "4px 8px", borderRadius: 6, border: "none",
-                background: "transparent", color: "#666", fontSize: 12, cursor: "pointer",
-                transition: "color 0.2s",
-              }} onMouseEnter={e => e.target.style.color = "#ddd"} onMouseLeave={e => e.target.style.color = "#666"}>↩</button>
+              <button onClick={handleUndo} title="Undo" style={{
+                width: 36, height: 36, borderRadius: 8, border: "1px solid #e0e0e0",
+                background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#666",
+              }}><Undo2 size={16} /></button>
             )}
             <div style={{ position: "relative" }}>
-              <button onClick={() => setShowDataMenu(!showDataMenu)} style={{
-                padding: "4px 8px", borderRadius: 6, border: "none",
-                background: "transparent", color: "#666", fontSize: 14, cursor: "pointer",
-                transition: "color 0.2s",
-              }} onMouseEnter={e => e.target.style.color = "#ddd"} onMouseLeave={e => e.target.style.color = "#666"}>⚙</button>
+              <button onClick={() => setShowDataMenu(!showDataMenu)} title="Settings" style={{
+                width: 36, height: 36, borderRadius: 8, border: "1px solid #e0e0e0",
+                background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#666",
+              }}><Settings size={16} /></button>
               {showDataMenu && (
                 <div style={{
                   position: "absolute", top: "100%", right: 0, marginTop: 6, background: "#fff",
                   borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.15)", overflow: "hidden", zIndex: 50, minWidth: 200,
                 }}>
                   <button onClick={handleExportCSV} style={{
-                    display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
+                    display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "10px 14px",
                     border: "none", borderBottom: "1px solid #f5f5f5", background: "#fff",
                     fontSize: 13, color: "#222", cursor: "pointer", fontWeight: 500,
-                  }}>📤 Export CSV</button>
+                  }}><Upload size={14} color="#666" /> Export CSV</button>
                   <button onClick={handleImportCSV} style={{
-                    display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
+                    display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "10px 14px",
                     border: "none", borderBottom: "1px solid #f5f5f5", background: "#fff",
                     fontSize: 13, color: "#222", cursor: "pointer", fontWeight: 500,
-                  }}>📥 Import CSV</button>
+                  }}><Download size={14} color="#666" /> Import CSV</button>
                   <button onClick={handleLoadSampleData} style={{
-                    display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
+                    display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "10px 14px",
                     border: "none", borderBottom: "1px solid #f5f5f5", background: "#fff",
                     fontSize: 13, color: "#222", cursor: "pointer", fontWeight: 500,
-                  }}>📋 Load Sample Data</button>
+                  }}><ClipboardList size={14} color="#666" /> Load Sample Data</button>
                   <button onClick={handleDuplicateScan} style={{
-                    display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
+                    display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "10px 14px",
                     border: "none", borderBottom: "1px solid #f5f5f5", background: "#fff",
                     fontSize: 13, color: "#222", cursor: "pointer", fontWeight: 500,
-                  }}>🔍 Find Duplicates</button>
+                  }}><Search size={14} color="#666" /> Find Duplicates</button>
                   <button onClick={handleClearAll} style={{
-                    display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
+                    display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "10px 14px",
                     border: "none", background: "#fff",
                     fontSize: 13, color: "#dc2626", cursor: "pointer", fontWeight: 500,
-                  }}>🗑 Clear All Items</button>
+                  }}><Trash2 size={14} color="#dc2626" /> Clear All Items</button>
                 </div>
               )}
             </div>
@@ -1175,97 +1246,71 @@ export default function App() {
       </div>
 
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "14px 12px" }}>
-        <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: "2px solid #111", marginBottom: 14 }}>
-          {[["browse","Browse"],["store","Store"],["search","Find"]].map(([m,l]) => {
-            const disabled = !nlpAvailable && m !== "browse";
-            return (
-              <button key={m} onClick={() => { if (!disabled) { setMode(m); setMessage(null); } }}
-                title={disabled ? "Set up Cloudflare Worker proxy to enable NLP" : ""}
-                style={{
-                  flex: 1, padding: "10px 0", border: "none", cursor: disabled ? "not-allowed" : "pointer",
-                  fontWeight: 600, fontSize: 13, fontFamily: "'Rubik', sans-serif", letterSpacing: "0.03em",
-                  background: mode === m ? "#000" : "#fff",
-                  color: mode === m ? "#fff" : disabled ? "#ccc" : "#555",
-                  opacity: disabled ? 0.6 : 1,
-                }}>{l}</button>
-            );
-          })}
-        </div>
-
-        {!nlpAvailable && mode === "browse" && totalItems === 0 && (
-          <div style={{ padding: "10px 14px", borderRadius: 10, marginBottom: 12, fontSize: 12, lineHeight: 1.5, background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }}>
-            NLP features (Store & Find) require a Cloudflare Worker proxy. Browse mode and manual add work without it. Load sample data from ⚙ to explore.
-          </div>
-        )}
-
-        {(mode === "store" || mode === "search") && nlpAvailable && (
-          <>
-            <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 8 }}>
+        {nlpAvailable && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
               <div style={{ flex: 1, position: "relative" }}>
                 <textarea value={input} onChange={e => setInput(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
-                  placeholder={mode === "store"
-                    ? 'e.g. "Spare lightbulbs on the wood shelf in the garage"'
-                    : 'e.g. "Do I have any lightbulbs?"'}
+                  placeholder={'"Put the hammer in the garage" or "Where are my tools?"'}
                   maxLength={MAX_INPUT_LENGTH}
                   rows={2}
                   style={{
-                    width: "100%", borderRadius: 10, border: "1px solid " + (speech.listening ? "#ef4444" : "#ddd"),
-                    padding: "10px 12px", fontSize: 14, resize: "none",
-                    fontFamily: "inherit", outline: "none", boxSizing: "border-box", transition: "border-color .2s",
+                    width: "100%", borderRadius: 12, border: "2px solid " + (speech.listening ? "#ef4444" : "#e0e0e0"),
+                    padding: "14px 16px", paddingRight: 52, fontSize: 15, resize: "none",
+                    fontFamily: "inherit", outline: "none", boxSizing: "border-box",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
                   }}
                 />
                 {speech.listening && (
-                  <div style={{ position: "absolute", bottom: -18, left: 0, fontSize: 11, color: "#ef4444", fontWeight: 600, animation: "fadeIn .2s ease" }}>🎤 Listening...</div>
+                  <div style={{ position: "absolute", bottom: -20, left: 0, fontSize: 11, color: "#ef4444", fontWeight: 600, display: "flex", alignItems: "center", gap: 4, animation: "fadeIn .2s ease" }}>
+                    <Mic size={12} /> Listening...
+                  </div>
                 )}
               </div>
-              {speech.supported && (
-                <button onClick={speech.toggle} style={{
-                  width: 44, height: 44, borderRadius: "50%", border: "none", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                  background: speech.listening ? "#ef4444" : "#0e7490",
-                  animation: speech.listening ? "pulse 1.5s infinite" : "none",
-                  marginBottom: speech.listening ? 18 : 0,
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                {speech.supported && (
+                  <button onClick={speech.toggle} title={speech.listening ? "Stop listening" : "Voice input"} style={{
+                    width: 44, height: 44, borderRadius: "50%", border: "none", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: speech.listening ? "#ef4444" : "#f5f5f5",
+                    color: speech.listening ? "#fff" : "#666",
+                    animation: speech.listening ? "pulse 1.5s infinite" : "none",
+                  }}>
+                    {speech.listening ? <MicOff size={20} /> : <Mic size={20} />}
+                  </button>
+                )}
+                <button onClick={handleSubmit} disabled={loading || !input.trim()} title="Send" style={{
+                  width: 44, height: 44, borderRadius: "50%", border: "none", cursor: loading ? "wait" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: loading ? "#999" : "#0e7490", color: "#fff",
+                  opacity: !input.trim() && !loading ? 0.4 : 1,
                 }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                    <path d="M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4z"/>
-                    <path d="M19 10v1a7 7 0 0 1-14 0v-1H3v1a9 9 0 0 0 8 8.94V22h2v-2.06A9 9 0 0 0 21 11v-1h-2z"/>
-                  </svg>
+                  <Send size={20} />
                 </button>
-              )}
+              </div>
             </div>
-            {speech.error && <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 6, marginTop: speech.listening ? 10 : 0 }}>{speech.error}</div>}
-            <button onClick={handleSubmit} disabled={loading || !input.trim()} style={{
-              width: "100%", padding: "11px", borderRadius: 8, border: "none",
-              fontWeight: 600, fontSize: 14, fontFamily: "'Rubik', sans-serif",
-              cursor: loading ? "wait" : "pointer",
-              background: loading ? "#999" : "#0e7490",
-              color: "#fff", marginBottom: 14, marginTop: speech.listening ? 10 : 0,
-              opacity: !input.trim() && !loading ? 0.5 : 1,
-            }}>{loading ? "Thinking..." : mode === "store" ? "Store" : "Search"}</button>
-          </>
+            {speech.error && <div style={{ fontSize: 12, color: "#dc2626", marginTop: 6 }}>{speech.error}</div>}
+          </div>
         )}
 
-        {message && (
-          <div style={{
-            padding: "10px 14px", borderRadius: 10, marginBottom: 12, fontSize: 13, lineHeight: 1.5,
-            animation: "fadeIn .2s ease",
-            background: message.type === "error" ? "#fef2f2" : message.type === "info" ? "#e8f7fa" : "#e8f7fa",
-            color: message.type === "error" ? "#991b1b" : message.type === "info" ? "#0a5c6e" : "#0a5c6e",
-            border: "1px solid " + (message.type === "error" ? "#fecaca" : message.type === "info" ? "#a3d5de" : "#a3d5de"),
-            whiteSpace: "pre-wrap",
-          }}>{message.text}</div>
+        {!nlpAvailable && totalItems === 0 && (
+          <div style={{ padding: "10px 14px", borderRadius: 10, marginBottom: 12, fontSize: 12, lineHeight: 1.5, background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }}>
+            AI features require a Cloudflare Worker proxy. Manual add and browse work without it. Load sample data from the settings menu to explore.
+          </div>
         )}
+
+        {message && <ResultCard message={message} onDismiss={() => setMessage(null)} />}
 
         <Breadcrumb chain={breadcrumb} onNavigate={setCurrentId} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontFamily: "'Rubik', sans-serif", fontSize: 19, fontWeight: 600, color: "#111" }}>
-              {TYPE_ICONS[currentNode.type]} {currentNode.name}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontFamily: "'Rubik', sans-serif", fontSize: 19, fontWeight: 600, color: "#111", display: "flex", alignItems: "center", gap: 6 }}>
+              <TypeIcon type={currentNode.type} size={20} /> {currentNode.name}
             </span>
             {canRename && (
               <button onClick={() => setRenamingLocation(currentNode)} title="Rename"
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 13, padding: "2px 4px" }}>✏️</button>
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#999", padding: "2px 4px", display: "flex", alignItems: "center" }}><Pencil size={13} /></button>
             )}
             <span style={{ fontSize: 13, color: "#999" }}>
               {countItems(currentNode)} item{countItems(currentNode) !== 1 ? "s" : ""}
