@@ -128,14 +128,16 @@ function findAllDuplicateGroups(tree) {
   }
   return groups;
 }
-function findOrCreatePath(tree, pathNames, types) {
+function findOrCreatePath(tree, pathNames, types, source = "manual") {
   let updated = { ...tree }, parentId = tree.id;
   for (let i = 0; i < pathNames.length; i++) {
     const name = pathNames[i], type = types[i] || "container";
     const parent = findNode(updated, parentId);
     let match = (parent.children || []).find(c => c.name.toLowerCase() === name.toLowerCase());
     if (!match) {
-      const nn = { id: uid() + i, name, type, children: [] };
+      const parentChain = findParentChain(updated, parentId);
+      const parentPath = parentChain ? parentChain.map(n => n.name) : [];
+      const nn = { id: uid() + i, name, type, children: [], history: [{ event: "created", timestamp: nowISO(), source, parentPath }] };
       updated = addToTree(updated, parentId, nn);
       parentId = nn.id;
     } else { parentId = match.id; }
@@ -177,8 +179,50 @@ function findOrCreateLocation(tree, locationName, type, parentPath) {
   }
   const existing = (current.children || []).find(c => c.name.toLowerCase() === locationName.toLowerCase() && c.type === type);
   if (existing) return tree;
-  const newNode = { id: uid(), name: locationName, type, children: [] };
+  const newNode = { id: uid(), name: locationName, type, children: [], history: [{ event: "created", timestamp: nowISO(), source: "ai", parentPath: parentPath }] };
   return addToTree(tree, current.id, newNode);
+}
+
+const nowISO = () => new Date().toISOString();
+function formatRelativeTime(iso) {
+  if (!iso) return "unknown";
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return diffMins + " min ago";
+  if (diffHours < 24) return "today at " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (diffDays === 1) return "yesterday";
+  if (diffDays < 7) return diffDays + " days ago";
+  if (diffDays < 30) return Math.floor(diffDays / 7) + " wk ago";
+  if (diffDays < 365) return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  return d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+}
+function migrateTree(node) {
+  return {
+    ...node,
+    history: node.history || [],
+    ...(node.type === "house" ? { deletedLog: node.deletedLog || [] } : {}),
+    children: (node.children || []).map(migrateTree),
+  };
+}
+function addHistoryEntry(tree, nodeId, entry) {
+  const node = findNode(tree, nodeId);
+  if (!node) return tree;
+  return updateInTree(tree, nodeId, {
+    history: [...(node.history || []), { ...entry, timestamp: nowISO() }],
+  });
+}
+function snapshotToDeletedLog(tree, nodeId) {
+  const node = findNode(tree, nodeId);
+  if (!node) return tree;
+  const parentChain = findParentChain(tree, nodeId);
+  const parentPath = parentChain ? parentChain.slice(0, -1).map(n => n.name) : [];
+  const entry = { node, deletedAt: nowISO(), parentPath };
+  return { ...tree, deletedLog: [...(tree.deletedLog || []), entry].slice(-100) };
 }
 
 function escapeCSVField(value) {
@@ -272,11 +316,13 @@ function importCSVToTree(csvText) {
         types.push("container");
       }
     }
-    const { tree: updated, leafId } = findOrCreatePath(tree, pathNames, types);
+    const { tree: updated, leafId } = findOrCreatePath(tree, pathNames, types, "import");
     tree = updated;
     const validCat = CATEGORIES.includes(category) ? category : "misc";
     const quantity = qtyStr === "" ? null : (isNaN(Number(qtyStr)) ? null : Number(qtyStr));
-    tree = addToTree(tree, leafId, { id: uid(), name: itemName, type: "item", quantity, category: validCat, children: [] });
+    const importChain = findParentChain(tree, leafId);
+    const importParentPath = importChain ? importChain.map(n => n.name) : [];
+    tree = addToTree(tree, leafId, { id: uid(), name: itemName, type: "item", quantity, category: validCat, children: [], history: [{ event: "created", timestamp: nowISO(), source: "import", parentPath: importParentPath }] });
     count++;
   }
   return { tree, count, errors };
@@ -424,8 +470,9 @@ function Breadcrumb({ chain, onNavigate }) {
   );
 }
 
-function ItemCard({ node, onDelete, onEdit, onMove }) {
+function ItemCard({ node, onDelete, onEdit, onMove, onHistory }) {
   const cat = node.category || "misc";
+  const createdEntry = node.history && node.history.length > 0 ? node.history[0] : null;
   return (
     <div style={{
       background: "#fff", borderRadius: 8, padding: "10px 14px",
@@ -437,10 +484,14 @@ function ItemCard({ node, onDelete, onEdit, onMove }) {
         fontFamily: "'Rubik', sans-serif", letterSpacing: "0.04em",
       }}>{cat}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ fontWeight: 600, fontSize: 14, color: "#111", textTransform: "capitalize" }}>{node.name}</span>
-        {node.quantity != null && <span style={{ fontSize: 12, color: "#999", marginLeft: 6 }}>×{node.quantity}</span>}
+        <div>
+          <span style={{ fontWeight: 600, fontSize: 14, color: "#111", textTransform: "capitalize" }}>{node.name}</span>
+          {node.quantity != null && <span style={{ fontSize: 12, color: "#999", marginLeft: 6 }}>×{node.quantity}</span>}
+        </div>
+        {createdEntry && <div style={{ fontSize: 10, color: "#bbb", marginTop: 1 }}>Added {formatRelativeTime(createdEntry.timestamp)}</div>}
       </div>
       <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+        <button onClick={() => onHistory(node)} title="History" style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 13, padding: 4 }}>🕐</button>
         <button onClick={() => onEdit(node)} title="Edit" style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 14, padding: 4 }}>✏️</button>
         <button onClick={() => onMove(node)} title="Move" style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 14, padding: 4 }}>📂</button>
         <button onClick={() => onDelete(node.id)} title="Delete" style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 14, padding: 4 }}>✕</button>
@@ -449,13 +500,14 @@ function ItemCard({ node, onDelete, onEdit, onMove }) {
   );
 }
 
-function LocationCard({ node, onClick, onRename, onDelete, onMove }) {
+function LocationCard({ node, onClick, onRename, onDelete, onMove, onHistory }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(node.name);
   const count = countItems(node);
   const color = TYPE_COLORS[node.type] || "#666";
   const isDeletable = node.type === "container" || node.type === "room" || node.type === "floor";
   const isMovable = node.type === "room" || node.type === "floor" || node.type === "container";
+  const createdEntry = node.history && node.history.length > 0 ? node.history[0] : null;
 
   if (editing) {
     return (
@@ -500,9 +552,12 @@ function LocationCard({ node, onClick, onRename, onDelete, onMove }) {
           {count > 0 ? count + " item" + (count !== 1 ? "s" : "") : "empty"}
           {(node.children || []).filter(c => c.type !== "item").length > 0 &&
             " · " + (node.children || []).filter(c => c.type !== "item").length + " sub-locations"}
+          {createdEntry && <span style={{ color: "#ccc" }}> · Added {formatRelativeTime(createdEntry.timestamp)}</span>}
         </div>
       </div>
       <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+        <button onClick={(e) => { e.stopPropagation(); onHistory(node); }} title="History"
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 13, padding: 4 }}>🕐</button>
         <button onClick={(e) => { e.stopPropagation(); setEditing(true); }} title="Rename"
           style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: 13, padding: 4 }}>✏️</button>
         {isMovable && (
@@ -789,6 +844,101 @@ function DuplicateScanModal({ groups, onMerge, onClose }) {
   );
 }
 
+function HistoryModal({ node, onClose }) {
+  const entries = [...(node.history || [])].reverse();
+  const formatEntry = (entry) => {
+    switch (entry.event) {
+      case "created": {
+        const loc = entry.parentPath && entry.parentPath.length > 0 ? " in " + entry.parentPath.join(" > ") : "";
+        const src = entry.source === "ai" ? " via AI" : entry.source === "import" ? " via import" : " manually";
+        return "Created" + loc + src;
+      }
+      case "moved":
+        return "Moved from " + (entry.fromPath || []).join(" > ") + " to " + (entry.toPath || []).join(" > ");
+      case "renamed":
+        return `Renamed from "${entry.from}" to "${entry.to}"`;
+      case "quantity_changed":
+        return `Quantity: ${entry.from == null ? "unknown" : entry.from} → ${entry.to == null ? "unknown" : entry.to}`;
+      case "category_changed":
+        return `Category: ${entry.from} → ${entry.to}`;
+      default:
+        return entry.event;
+    }
+  };
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 110, padding: 16 }}
+      onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 420, maxHeight: "72vh", display: "flex", flexDirection: "column", animation: "fadeIn .2s ease" }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 2 }}>
+          {TYPE_ICONS[node.type]} {node.name}
+        </div>
+        <div style={{ fontSize: 12, color: "#999", marginBottom: 14, textTransform: "capitalize" }}>{node.type} history</div>
+        <div style={{ flex: 1, overflow: "auto" }}>
+          {entries.length === 0 ? (
+            <div style={{ textAlign: "center", color: "#999", padding: "20px 0", fontSize: 13 }}>No history recorded</div>
+          ) : (
+            entries.map((entry, i) => (
+              <div key={i} style={{ display: "flex", gap: 10, paddingBottom: 12, marginBottom: 12, borderBottom: i < entries.length - 1 ? "1px solid #f5f5f5" : "none" }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#0e7490", flexShrink: 0, marginTop: 5 }} />
+                <div>
+                  <div style={{ fontSize: 13, color: "#111", fontWeight: 500 }}>{formatEntry(entry)}</div>
+                  <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }} title={entry.timestamp}>{formatRelativeTime(entry.timestamp)}</div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        <button onClick={onClose} style={{ marginTop: 12, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Close</button>
+      </div>
+    </div>
+  );
+}
+
+function DeletedLogModal({ deletedLog, onClose }) {
+  const [viewingHistory, setViewingHistory] = useState(null);
+  const entries = [...(deletedLog || [])].reverse();
+  if (viewingHistory) {
+    return <HistoryModal node={viewingHistory} onClose={() => setViewingHistory(null)} />;
+  }
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
+      onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 420, maxHeight: "72vh", display: "flex", flexDirection: "column", animation: "fadeIn .2s ease" }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 2 }}>Recently Deleted</div>
+        <div style={{ fontSize: 12, color: "#999", marginBottom: 14 }}>
+          {entries.length > 0 ? entries.length + " item" + (entries.length !== 1 ? "s" : "") : "Nothing deleted yet"}
+        </div>
+        <div style={{ flex: 1, overflow: "auto" }}>
+          {entries.length === 0 ? (
+            <div style={{ textAlign: "center", color: "#999", padding: "20px 0", fontSize: 13 }}>Nothing deleted yet.</div>
+          ) : (
+            entries.map((entry, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: i < entries.length - 1 ? "1px solid #f5f5f5" : "none" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{TYPE_ICONS[entry.node.type]} {entry.node.name}</div>
+                  <div style={{ fontSize: 11, color: "#aaa", marginTop: 1 }}>
+                    {entry.parentPath.length > 0 ? entry.parentPath.join(" > ") + " · " : ""}
+                    Deleted {formatRelativeTime(entry.deletedAt)}
+                  </div>
+                </div>
+                {(entry.node.history || []).length > 0 && (
+                  <button onClick={() => setViewingHistory(entry.node)}
+                    style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", color: "#0e7490", fontSize: 11, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+                    History
+                  </button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+        <button onClick={onClose} style={{ marginTop: 12, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Close</button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [tree, setTree] = useState(DEFAULT_STRUCTURE);
   const [currentId, setCurrentId] = useState("house");
@@ -807,6 +957,8 @@ export default function App() {
   const [showDataMenu, setShowDataMenu] = useState(false);
   const [pendingStore, setPendingStore] = useState(null);
   const [duplicateScanResults, setDuplicateScanResults] = useState(null);
+  const [historyNode, setHistoryNode] = useState(null);
+  const [showDeletedLog, setShowDeletedLog] = useState(false);
   const speech = useSpeech();
 
   const fileInputRef = useRef(null);
@@ -821,9 +973,9 @@ export default function App() {
     let cancelled = false;
     // Show local data immediately, then replace with server data
     const local = loadDataLocal();
-    if (local) setTree(local);
+    if (local) setTree(migrateTree(local));
     loadDataFromServer().then(d => {
-      if (!cancelled && d) setTree(d);
+      if (!cancelled && d) setTree(migrateTree(d));
       if (!cancelled) setReady(true);
     });
     return () => { cancelled = true; };
@@ -866,7 +1018,10 @@ export default function App() {
           for (const item of parsed.items) {
             const all = flattenItems(updated);
             const match = all.find(n => n.name === item.name);
-            if (match) updated = removeFromTree(updated, match.id);
+            if (match) {
+              updated = snapshotToDeletedLog(updated, match.id);
+              updated = removeFromTree(updated, match.id);
+            }
           }
           setTree(updated);
           setMessage({ type: "success", text: "Removed: " + parsed.items.map(i => i.name).join(", ") });
@@ -883,7 +1038,7 @@ export default function App() {
           for (const item of parsed.items) {
             const pathNames = item.path || [];
             const types = pathNames.map((_, i) => i === 0 ? "floor" : i === 1 ? "room" : "container");
-            const { tree: t, leafId } = findOrCreatePath(tempTree, pathNames, types);
+            const { tree: t, leafId } = findOrCreatePath(tempTree, pathNames, types, "ai");
             tempTree = t;
             const chain = findParentChain(tempTree, leafId);
             const targetPath = chain ? chain.map(n => n.name).join(" > ") : pathNames.join(" > ");
@@ -900,7 +1055,9 @@ export default function App() {
               const parent = findNode(tempTree, item.leafId);
               const existing = (parent.children || []).find(c => c.type === "item" && c.name === item.name);
               if (existing) tempTree = removeFromTree(tempTree, existing.id);
-              const itemNode = { id: uid(), name: item.name, type: "item", quantity: item.quantity, category: item.category || "misc", children: [] };
+              const itemParentChain = findParentChain(tempTree, item.leafId);
+              const itemParentPath = itemParentChain ? itemParentChain.map(n => n.name) : (item.path || []);
+              const itemNode = { id: uid(), name: item.name, type: "item", quantity: item.quantity, category: item.category || "misc", children: [], history: [{ event: "created", timestamp: nowISO(), source: "ai", parentPath: itemParentPath }] };
               tempTree = addToTree(tempTree, item.leafId, itemNode);
               const ch = findParentChain(tempTree, itemNode.id);
               stored.push(ch ? ch.map(n => n.name).join(" > ") : item.name);
@@ -932,14 +1089,19 @@ export default function App() {
           const newQty = (existing.quantity != null || item.quantity != null)
             ? (existing.quantity || 0) + (item.quantity || 0) : null;
           updated = updateInTree(updated, existing.id, { quantity: newQty });
+          updated = addHistoryEntry(updated, existing.id, { event: "quantity_changed", from: existing.quantity, to: newQty });
           const chain = findParentChain(updated, existing.id);
           stored.push((chain ? chain.map(n => n.name).join(" > ") : existing.name) + " (updated qty)");
         }
       } else if (choice.action === "moveHere" && choice.targetId) {
         const existing = findNode(updated, choice.targetId);
         if (existing) {
+          const fromChain = findParentChain(updated, existing.id);
+          const fromPath = fromChain ? fromChain.slice(0, -1).map(n => n.name) : [];
+          const toChain = findParentChain(updated, item.leafId);
+          const toPath = toChain ? toChain.map(n => n.name) : [];
           updated = removeFromTree(updated, existing.id);
-          const movedNode = { ...existing, quantity: item.quantity != null ? item.quantity : existing.quantity };
+          const movedNode = { ...existing, quantity: item.quantity != null ? item.quantity : existing.quantity, history: [...(existing.history || []), { event: "moved", fromPath, toPath, timestamp: nowISO() }] };
           updated = addToTree(updated, item.leafId, movedNode);
           const chain = findParentChain(updated, movedNode.id);
           stored.push((chain ? chain.map(n => n.name).join(" > ") : item.name) + " (moved)");
@@ -948,7 +1110,9 @@ export default function App() {
         const parent = findNode(updated, item.leafId);
         const existingInSameLocation = (parent.children || []).find(c => c.type === "item" && c.name === item.name);
         if (existingInSameLocation) updated = removeFromTree(updated, existingInSameLocation.id);
-        const itemNode = { id: uid(), name: item.name, type: "item", quantity: item.quantity, category: item.category || "misc", children: [] };
+        const newItemParentChain = findParentChain(updated, item.leafId);
+        const newItemParentPath = newItemParentChain ? newItemParentChain.map(n => n.name) : (item.path || []);
+        const itemNode = { id: uid(), name: item.name, type: "item", quantity: item.quantity, category: item.category || "misc", children: [], history: [{ event: "created", timestamp: nowISO(), source: "ai", parentPath: newItemParentPath }] };
         updated = addToTree(updated, item.leafId, itemNode);
         const chain = findParentChain(updated, itemNode.id);
         stored.push(chain ? chain.map(n => n.name).join(" > ") : item.name);
@@ -973,7 +1137,10 @@ export default function App() {
     let totalQty = 0, hasQty = false;
     for (const item of group) {
       if (item.quantity != null) { totalQty += item.quantity; hasQty = true; }
-      if (item.id !== keepId) updated = removeFromTree(updated, item.id);
+      if (item.id !== keepId) {
+        updated = snapshotToDeletedLog(updated, item.id);
+        updated = removeFromTree(updated, item.id);
+      }
     }
     if (hasQty) updated = updateInTree(updated, keepId, { quantity: totalQty });
     setTree(updated);
@@ -989,7 +1156,8 @@ export default function App() {
 
   const handleDelete = (id) => {
     setUndoStack(prev => [...prev.slice(-9), { tree, label: "delete" }]);
-    setTree(t => removeFromTree(t, id));
+    const withLog = snapshotToDeletedLog(tree, id);
+    setTree(removeFromTree(withLog, id));
   };
   const handleUndo = () => {
     if (!undoStack.length) return;
@@ -1001,40 +1169,64 @@ export default function App() {
   const handleEditSave = (updates) => {
     if (!editingItem) return;
     setUndoStack(prev => [...prev.slice(-9), { tree, label: "edit" }]);
-    setTree(t => updateInTree(t, editingItem.id, updates));
+    let newTree = updateInTree(tree, editingItem.id, updates);
+    if (updates.name !== undefined && updates.name !== editingItem.name)
+      newTree = addHistoryEntry(newTree, editingItem.id, { event: "renamed", from: editingItem.name, to: updates.name });
+    if (updates.quantity !== undefined && updates.quantity !== editingItem.quantity)
+      newTree = addHistoryEntry(newTree, editingItem.id, { event: "quantity_changed", from: editingItem.quantity, to: updates.quantity });
+    if (updates.category !== undefined && updates.category !== editingItem.category)
+      newTree = addHistoryEntry(newTree, editingItem.id, { event: "category_changed", from: editingItem.category, to: updates.category });
+    setTree(newTree);
     setEditingItem(null);
   };
   const handleRenameLocation = (id, newName) => {
+    const node = findNode(tree, id);
+    const oldName = node ? node.name : "";
     setUndoStack(prev => [...prev.slice(-9), { tree, label: "rename" }]);
-    setTree(t => updateInTree(t, id, { name: newName }));
+    let newTree = updateInTree(tree, id, { name: newName });
+    if (oldName && oldName !== newName)
+      newTree = addHistoryEntry(newTree, id, { event: "renamed", from: oldName, to: newName });
+    setTree(newTree);
   };
   const handleMoveItem = (destId) => {
     if (!movingItem) return;
     setUndoStack(prev => [...prev.slice(-9), { tree, label: "move" }]);
-    const itemCopy = { ...findNode(tree, movingItem.id) };
+    const itemNode = findNode(tree, movingItem.id);
+    const fromChain = findParentChain(tree, movingItem.id);
+    const fromPath = fromChain ? fromChain.slice(0, -1).map(n => n.name) : [];
+    const destChain = findParentChain(tree, destId);
+    const toPath = destChain ? destChain.map(n => n.name) : [];
+    const movedNode = { ...itemNode, history: [...(itemNode.history || []), { event: "moved", fromPath, toPath, timestamp: nowISO() }] };
     let updated = removeFromTree(tree, movingItem.id);
-    updated = addToTree(updated, destId, itemCopy);
+    updated = addToTree(updated, destId, movedNode);
     setTree(updated);
     setMovingItem(null);
-    const destChain = findParentChain(updated, destId);
-    setMessage({ type: "success", text: 'Moved "' + itemCopy.name + '" to ' + (destChain ? destChain.map(n => n.name).join(" > ") : "new location") });
+    setMessage({ type: "success", text: 'Moved "' + movedNode.name + '" to ' + (toPath.length ? toPath.join(" > ") : "new location") });
   };
   const handleAddContainer = (name) => {
-    setTree(t => addToTree(t, currentId, { id: uid(), name, type: "container", children: [] }));
+    const parentPath = findParentChain(tree, currentId);
+    const containerNode = { id: uid(), name, type: "container", children: [], history: [{ event: "created", timestamp: nowISO(), source: "manual", parentPath: parentPath ? parentPath.map(n => n.name) : [] }] };
+    setTree(t => addToTree(t, currentId, containerNode));
     setAdding(false);
   };
   const handleMoveLocation = (destId) => {
     if (!movingLocation) return;
     setUndoStack(prev => [...prev.slice(-9), { tree, label: "move" }]);
-    const updated = moveNode(tree, movingLocation.id, destId);
+    const fromChain = findParentChain(tree, movingLocation.id);
+    const fromPath = fromChain ? fromChain.slice(0, -1).map(n => n.name) : [];
+    const destChain = findParentChain(tree, destId);
+    const toPath = destChain ? destChain.map(n => n.name) : [];
+    let updated = moveNode(tree, movingLocation.id, destId);
+    updated = addHistoryEntry(updated, movingLocation.id, { event: "moved", fromPath, toPath });
     setTree(updated);
     setMovingLocation(null);
-    const destChain = findParentChain(updated, destId);
-    setMessage({ type: "success", text: 'Moved "' + movingLocation.name + '" to ' + (destChain ? destChain.map(n => n.name).join(" > ") : "new location") });
+    setMessage({ type: "success", text: 'Moved "' + movingLocation.name + '" to ' + (toPath.length ? toPath.join(" > ") : "new location") });
   };
   const handleQuickAddItem = (name, cat) => {
     setUndoStack(prev => [...prev.slice(-9), { tree, label: "add" }]);
-    setTree(t => addToTree(t, currentId, { id: uid(), name, type: "item", quantity: null, category: cat, children: [] }));
+    const parentPath = findParentChain(tree, currentId);
+    const itemNode = { id: uid(), name, type: "item", quantity: null, category: cat, children: [], history: [{ event: "created", timestamp: nowISO(), source: "manual", parentPath: parentPath ? parentPath.map(n => n.name) : [] }] };
+    setTree(t => addToTree(t, currentId, itemNode));
     setAddingItem(false);
   };
   const handleExportCSV = () => {
@@ -1115,6 +1307,8 @@ export default function App() {
       {renamingLocation && <RenameModal node={renamingLocation} onSave={(name) => { handleRenameLocation(renamingLocation.id, name); setRenamingLocation(null); }} onCancel={() => setRenamingLocation(null)} />}
       {pendingStore && <DuplicateSuggestionModal pendingStore={pendingStore} onResolve={handleResolveDuplicates} onCancel={() => setPendingStore(null)} />}
       {duplicateScanResults && <DuplicateScanModal groups={duplicateScanResults} onMerge={handleMergeDuplicates} onClose={() => setDuplicateScanResults(null)} />}
+      {historyNode && <HistoryModal node={historyNode} onClose={() => setHistoryNode(null)} />}
+      {showDeletedLog && <DeletedLogModal deletedLog={tree.deletedLog || []} onClose={() => setShowDeletedLog(false)} />}
 
       <div style={{ background: "#000", padding: "32px 16px 22px", color: "#fff" }}>
         <div style={{ maxWidth: 600, margin: "0 auto", position: "relative" }}>
@@ -1162,6 +1356,11 @@ export default function App() {
                     border: "none", borderBottom: "1px solid #f5f5f5", background: "#fff",
                     fontSize: 13, color: "#222", cursor: "pointer", fontWeight: 500,
                   }}>🔍 Find Duplicates</button>
+                  <button onClick={() => { setShowDeletedLog(true); setShowDataMenu(false); }} style={{
+                    display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
+                    border: "none", borderBottom: "1px solid #f5f5f5", background: "#fff",
+                    fontSize: 13, color: "#222", cursor: "pointer", fontWeight: 500,
+                  }}>🗂 Recently Deleted</button>
                   <button onClick={handleClearAll} style={{
                     display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
                     border: "none", background: "#fff",
@@ -1289,7 +1488,7 @@ export default function App() {
 
         {containers.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: items.length > 0 ? 14 : 0 }}>
-            {containers.map(c => <LocationCard key={c.id} node={c} onClick={setCurrentId} onRename={handleRenameLocation} onDelete={handleDelete} onMove={setMovingLocation} />)}
+            {containers.map(c => <LocationCard key={c.id} node={c} onClick={setCurrentId} onRename={handleRenameLocation} onDelete={handleDelete} onMove={setMovingLocation} onHistory={setHistoryNode} />)}
           </div>
         )}
 
@@ -1299,7 +1498,7 @@ export default function App() {
           <>
             <div style={{ fontFamily: "'Rubik', sans-serif", fontSize: 11, fontWeight: 500, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", margin: "14px 0 8px" }}>Items here</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              {items.map(i => <ItemCard key={i.id} node={i} onDelete={handleDelete} onEdit={setEditingItem} onMove={setMovingItem} />)}
+              {items.map(i => <ItemCard key={i.id} node={i} onDelete={handleDelete} onEdit={setEditingItem} onMove={setMovingItem} onHistory={setHistoryNode} />)}
             </div>
           </>
         )}
