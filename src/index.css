@@ -1,3 +1,7 @@
+html {
+  scrollbar-gutter: stable;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -13,6 +17,12 @@ body {
 
 input, textarea, select, button {
   font-family: inherit;
+}
+
+@supports (-webkit-touch-callout: none) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
 }
 
 button {
