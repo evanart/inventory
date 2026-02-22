@@ -895,7 +895,7 @@ function HistoryModal({ node, onClose }) {
       <div style={{ background: "#fff", borderRadius: 10, padding: 20, width: "100%", maxWidth: 420, maxHeight: "72vh", display: "flex", flexDirection: "column", animation: "fadeIn .2s ease" }}
         onClick={e => e.stopPropagation()}>
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, fontSize: 16, marginBottom: 2 }}>
-          {TYPE_ICONS[node.type]} {node.name}
+          <TypeIcon type={node.type} size={16} /> {node.name}
         </div>
         <div style={{ fontSize: 12, color: "#999", marginBottom: 14, textTransform: "capitalize" }}>{node.type} history</div>
         <div style={{ flex: 1, overflow: "auto" }}>
@@ -941,7 +941,7 @@ function DeletedLogModal({ deletedLog, onClose }) {
             entries.map((entry, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: i < entries.length - 1 ? "1px solid #f5f5f5" : "none" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{TYPE_ICONS[entry.node.type]} {entry.node.name}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}><TypeIcon type={entry.node.type} size={14} /> {entry.node.name}</div>
                   <div style={{ fontSize: 11, color: "#aaa", marginTop: 1 }}>
                     {entry.parentPath.length > 0 ? entry.parentPath.join(" > ") + " · " : ""}
                     Deleted {formatRelativeTime(entry.deletedAt)}
