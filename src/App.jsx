@@ -4,7 +4,7 @@ import {
   Pencil, FolderOpen, Trash2, Mic, MicOff,
   Upload, Download, ClipboardList, Search,
   Undo2, Settings, X, ChevronRight, Send,
-  Check, AlertCircle, Info, Loader2,
+  Check, AlertCircle, Info, Loader2, Clock,
 } from "lucide-react";
 
 const STORAGE_KEY = "home-inventory-v2";
@@ -521,7 +521,7 @@ function ItemCard({ node, onDelete, onEdit, onMove, onHistory }) {
         {createdEntry && <div style={{ fontSize: 10, color: "#bbb", marginTop: 1 }}>Added {formatRelativeTime(createdEntry.timestamp)}</div>}
       </div>
       <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-        <button onClick={() => onHistory(node)} title="History" style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", padding: 4, display: "flex", alignItems: "center" }}>🕐</button>
+        <button onClick={() => onHistory(node)} title="History" style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", padding: 4, display: "flex", alignItems: "center" }}><Clock size={14} /></button>
         <button onClick={() => onEdit(node)} title="Edit" style={{ background: "none", border: "none", cursor: "pointer", color: "#999", padding: 4, display: "flex", alignItems: "center" }}><Pencil size={14} /></button>
         <button onClick={() => onMove(node)} title="Move" style={{ background: "none", border: "none", cursor: "pointer", color: "#999", padding: 4, display: "flex", alignItems: "center" }}><FolderOpen size={14} /></button>
         <button onClick={() => onDelete(node.id)} title="Delete" style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", padding: 4, display: "flex", alignItems: "center" }}><X size={14} /></button>
@@ -587,7 +587,7 @@ function LocationCard({ node, onClick, onRename, onDelete, onMove, onHistory }) 
       </div>
       <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
         <button onClick={(e) => { e.stopPropagation(); onHistory(node); }} title="History"
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 13, padding: 4 }}>🕐</button>
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", padding: 4, display: "flex", alignItems: "center" }}><Clock size={14} /></button>
         <button onClick={(e) => { e.stopPropagation(); setEditing(true); }} title="Rename"
           style={{ background: "none", border: "none", cursor: "pointer", color: "#999", padding: 4, display: "flex", alignItems: "center" }}><Pencil size={14} /></button>
         {isMovable && (
