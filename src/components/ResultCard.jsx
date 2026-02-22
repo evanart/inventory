@@ -53,7 +53,7 @@ export default function ResultCard({ message, onDismiss }) {
         </div>
       </div>
       <button onClick={() => setVisible(false)} style={{
-        background: "none", border: "none", cursor: "pointer", padding: 4, flexShrink: 0,
+        background: "none", border: "none", cursor: "pointer", padding: 8, flexShrink: 0,
         color: "#999", display: "flex", alignItems: "center",
       }}>
         <X size={16} />

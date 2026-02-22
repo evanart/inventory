@@ -13,8 +13,8 @@ export default function RenameModal({ node, onSave, onCancel }) {
           onKeyDown={e => { if (e.key === "Enter" && name.trim()) onSave(name.trim()); if (e.key === "Escape") onCancel(); }}
           style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #ddd", fontSize: 15, fontWeight: 600, marginBottom: 14, boxSizing: "border-box", outline: "none" }} />
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={onCancel} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-          <button onClick={() => { if (name.trim()) onSave(name.trim()); }} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "none", background: TYPE_COLORS[node.type] || "#0e7490", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Save</button>
+          <button onClick={onCancel} style={{ flex: 1, padding: "11px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+          <button onClick={() => { if (name.trim()) onSave(name.trim()); }} style={{ flex: 1, padding: "11px", borderRadius: 8, border: "none", background: TYPE_COLORS[node.type] || "#0e7490", color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Save</button>
         </div>
       </div>
     </div>

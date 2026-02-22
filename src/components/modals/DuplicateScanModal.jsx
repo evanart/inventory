@@ -24,13 +24,13 @@ export default function DuplicateScanModal({ groups, onMerge, onClose }) {
                   {item.quantity != null && <span style={{ color: "#999" }}>{"\u00D7"}{item.quantity}</span>}
                   <span style={{ color: "#999", fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.fullPath}</span>
                   <button onClick={() => onMerge(group, item.id)} title="Merge all into this one"
-                    style={{ padding: "2px 8px", borderRadius: 4, border: "1px solid #ddd", background: "#fff", color: "#0e7490", fontSize: 10, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>Keep</button>
+                    style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid #ddd", background: "#fff", color: "#0e7490", fontSize: 11, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>Keep</button>
                 </div>
               ))}
             </div>
           ))}
         </div>
-        <button onClick={onClose} style={{ marginTop: 14, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Close</button>
+        <button onClick={onClose} style={{ marginTop: 14, padding: "11px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 14, cursor: "pointer", width: "100%" }}>Close</button>
       </div>
     </div>
   );

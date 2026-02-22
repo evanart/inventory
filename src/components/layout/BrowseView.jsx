@@ -26,7 +26,7 @@ export default function BrowseView({
           </span>
           {canRename && (
             <button onClick={() => onRenameLocation(currentNode)} title="Rename"
-              style={{ background: "none", border: "none", cursor: "pointer", color: "#999", padding: "2px 4px", display: "flex", alignItems: "center" }}><Pencil size={13} /></button>
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#999", padding: "4px 6px", display: "flex", alignItems: "center" }}><Pencil size={13} /></button>
           )}
           <span style={{ fontSize: 13, color: "#999" }}>
             {countItems(currentNode)} item{countItems(currentNode) !== 1 ? "s" : ""}
@@ -35,12 +35,12 @@ export default function BrowseView({
         {canAddItems && (
           <div style={{ display: "flex", gap: 6 }}>
             <button onClick={() => onSetAddingItem(true)} style={{
-              padding: "5px 12px", borderRadius: 6, border: "2px solid #0e7490",
-              background: "#fff", color: "#0e7490", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'Rubik', sans-serif",
+              padding: "7px 14px", borderRadius: 6, border: "2px solid #0e7490",
+              background: "#fff", color: "#0e7490", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Rubik', sans-serif",
             }}>+ Item</button>
             <button onClick={() => onSetAdding(true)} style={{
-              padding: "5px 12px", borderRadius: 6, border: "2px solid #111",
-              background: "#fff", color: "#111", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'Rubik', sans-serif",
+              padding: "7px 14px", borderRadius: 6, border: "2px solid #111",
+              background: "#fff", color: "#111", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Rubik', sans-serif",
             }}>+ Container</button>
           </div>
         )}
@@ -49,7 +49,7 @@ export default function BrowseView({
       {adding && <AddContainerInline onAdd={onAddContainer} onCancel={() => onSetAdding(false)} />}
 
       {containers.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: items.length > 0 ? 14 : 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: items.length > 0 ? 14 : 0 }}>
           {containers.map(c => <LocationCard key={c.id} node={c} onClick={onNavigate} onRename={onRename} onDelete={onDelete} onMove={onMoveLocation} onHistory={onHistory} />)}
         </div>
       )}
@@ -58,8 +58,8 @@ export default function BrowseView({
 
       {items.length > 0 && (
         <>
-          <div style={{ fontFamily: "'Rubik', sans-serif", fontSize: 11, fontWeight: 500, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", margin: "14px 0 8px" }}>Items here</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <div style={{ fontFamily: "'Rubik', sans-serif", fontSize: 12, fontWeight: 500, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", margin: "14px 0 8px" }}>Items here</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {items.map(i => <ItemCard key={i.id} node={i} onDelete={onDelete} onEdit={onEditItem} onMove={onMoveItem} onHistory={onHistory} />)}
           </div>
         </>

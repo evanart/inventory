@@ -1,7 +1,7 @@
 /** LocationCard -- Displays a floor/room/container with item count, inline rename, and action buttons */
 
 import { useState } from "react";
-import { Pencil, FolderOpen, X, ChevronRight } from "lucide-react";
+import { Pencil, FolderOpen, X, ChevronRight, Clock } from "lucide-react";
 import TypeIcon from "../TypeIcon.jsx";
 import { TYPE_COLORS } from "../../constants/nodeTypes.js";
 import { countItems } from "../../utils/tree.js";
@@ -35,9 +35,9 @@ export default function LocationCard({ node, onClick, onRename, onDelete, onMove
           style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 14, fontWeight: 600, outline: "none" }}
         />
         <button onClick={() => { if (name.trim()) { onRename(node.id, name.trim()); setEditing(false); } }}
-          style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: color, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Save</button>
+          style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: color, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Save</button>
         <button onClick={() => { setName(node.name); setEditing(false); }}
-          style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", color: "#666", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center" }}><X size={14} /></button>
+          style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", color: "#666", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center" }}><X size={14} /></button>
       </div>
     );
   }
@@ -62,20 +62,20 @@ export default function LocationCard({ node, onClick, onRename, onDelete, onMove
           {createdEntry && <span style={{ color: "#ccc" }}> · Added {formatRelativeTime(createdEntry.timestamp)}</span>}
         </div>
       </div>
-      <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
         <button onClick={(e) => { e.stopPropagation(); onHistory(node); }} title="History"
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 13, padding: 4 }}>🕐</button>
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", padding: 6, display: "flex", alignItems: "center" }}><Clock size={14} /></button>
         <button onClick={(e) => { e.stopPropagation(); setEditing(true); }} title="Rename"
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#999", padding: 4, display: "flex", alignItems: "center" }}><Pencil size={14} /></button>
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#999", padding: 6, display: "flex", alignItems: "center" }}><Pencil size={14} /></button>
         {isMovable && (
           <button onClick={(e) => { e.stopPropagation(); onMove(node); }} title="Move"
-            style={{ background: "none", border: "none", cursor: "pointer", color: "#999", padding: 4, display: "flex", alignItems: "center" }}><FolderOpen size={14} /></button>
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#999", padding: 6, display: "flex", alignItems: "center" }}><FolderOpen size={14} /></button>
         )}
         {isDeletable && (
           <button onClick={(e) => { e.stopPropagation(); if (count > 0 && (node.type === "room" || node.type === "floor")) { if (confirm("This " + node.type + " contains " + count + " item(s). Delete anyway?")) onDelete(node.id); } else { onDelete(node.id); } }} title={"Delete " + node.type}
-            style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", padding: 4, display: "flex", alignItems: "center" }}><X size={14} /></button>
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", padding: 6, display: "flex", alignItems: "center" }}><X size={14} /></button>
         )}
-        <div onClick={() => onClick(node.id)} style={{ color: "#ccc", padding: "0 2px", cursor: "pointer", display: "flex", alignItems: "center" }}><ChevronRight size={18} /></div>
+        <div onClick={() => onClick(node.id)} style={{ color: "#ccc", padding: "0 4px", cursor: "pointer", display: "flex", alignItems: "center" }}><ChevronRight size={18} /></div>
       </div>
     </div>
   );

@@ -50,7 +50,7 @@ export default function DuplicateSuggestionModal({ pendingStore, onResolve, onCa
                   ].map(opt => (
                     <button key={opt.action} onClick={() => setChoice(item.idx, opt.action)}
                       style={{
-                        padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                        padding: "6px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer",
                         border: choice.action === opt.action ? "none" : "1px solid #ddd",
                         background: choice.action === opt.action
                           ? (opt.action === "skip" ? "#fee2e2" : "#0e7490") : "#fff",
@@ -64,8 +64,8 @@ export default function DuplicateSuggestionModal({ pendingStore, onResolve, onCa
           })}
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-          <button onClick={onCancel} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-          <button onClick={() => onResolve(choices)} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "none", background: "#0e7490", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Confirm</button>
+          <button onClick={onCancel} style={{ flex: 1, padding: "11px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+          <button onClick={() => onResolve(choices)} style={{ flex: 1, padding: "11px", borderRadius: 8, border: "none", background: "#0e7490", color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Confirm</button>
         </div>
       </div>
     </div>

@@ -414,7 +414,7 @@ export default function App() {
         onClearAll={handleClearAll}
       />
 
-      <div style={{ maxWidth: 600, margin: "0 auto", padding: "14px 12px" }}>
+      <div style={{ maxWidth: 600, margin: "0 auto", padding: "14px 16px" }}>
         {nlpAvailable && (
           <NlpInputArea
             input={input}
