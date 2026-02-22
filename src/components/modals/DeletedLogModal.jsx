@@ -35,7 +35,7 @@ export default function DeletedLogModal({ deletedLog, onClose }) {
                 </div>
                 {(entry.node.history || []).length > 0 && (
                   <button onClick={() => setViewingHistory(entry.node)}
-                    style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", color: "#0e7490", fontSize: 11, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+                    style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", color: "#0e7490", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
                     History
                   </button>
                 )}
@@ -43,7 +43,7 @@ export default function DeletedLogModal({ deletedLog, onClose }) {
             ))
           )}
         </div>
-        <button onClick={onClose} style={{ marginTop: 12, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Close</button>
+        <button onClick={onClose} style={{ marginTop: 12, padding: "11px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 14, cursor: "pointer", width: "100%" }}>Close</button>
       </div>
     </div>
   );

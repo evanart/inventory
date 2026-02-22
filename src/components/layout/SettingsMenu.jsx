@@ -4,9 +4,9 @@ import { Upload, Download, ClipboardList, Search, Trash2 } from "lucide-react";
 
 export default function SettingsMenu({ onExportCSV, onImportCSV, onLoadSample, onDuplicateScan, onShowDeleted, onClearAll }) {
   const btnStyle = {
-    display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "10px 14px",
+    display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "12px 14px",
     border: "none", borderBottom: "1px solid #f5f5f5", background: "#fff",
-    fontSize: 13, color: "#222", cursor: "pointer", fontWeight: 500,
+    fontSize: 14, color: "#222", cursor: "pointer", fontWeight: 500,
   };
   return (
     <div style={{

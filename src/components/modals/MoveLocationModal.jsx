@@ -33,7 +33,7 @@ export default function MoveLocationModal({ node, tree, onMove, onCancel }) {
             validDestinations.map(loc => (
               <button key={loc.id} onClick={() => onMove(loc.id)}
                 style={{
-                  display: "flex", alignItems: "center", gap: 6, width: "100%", textAlign: "left", padding: "8px 12px",
+                  display: "flex", alignItems: "center", gap: 6, width: "100%", textAlign: "left", padding: "10px 12px",
                   paddingLeft: 12 + (loc.depth - 1) * 16, border: "none", borderBottom: "1px solid #f5f5f5",
                   background: "#fff", cursor: "pointer",
                   fontSize: 13, color: "#222",
@@ -44,7 +44,7 @@ export default function MoveLocationModal({ node, tree, onMove, onCancel }) {
             ))
           )}
         </div>
-        <button onClick={onCancel} style={{ marginTop: 12, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Cancel</button>
+        <button onClick={onCancel} style={{ marginTop: 12, padding: "11px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 14, cursor: "pointer", width: "100%" }}>Cancel</button>
       </div>
     </div>
   );

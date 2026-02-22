@@ -23,8 +23,8 @@ export default function LoadingIndicator({ onCancel }) {
         }} />
       </div>
       <button onClick={onCancel} style={{
-        padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd",
-        background: "#fff", color: "#666", fontSize: 12, fontWeight: 600,
+        padding: "8px 14px", borderRadius: 6, border: "1px solid #ddd",
+        background: "#fff", color: "#666", fontSize: 13, fontWeight: 600,
         cursor: "pointer", flexShrink: 0,
       }}>Cancel</button>
     </div>

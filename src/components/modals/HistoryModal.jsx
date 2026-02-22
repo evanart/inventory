@@ -48,7 +48,7 @@ export default function HistoryModal({ node, onClose }) {
             ))
           )}
         </div>
-        <button onClick={onClose} style={{ marginTop: 12, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Close</button>
+        <button onClick={onClose} style={{ marginTop: 12, padding: "11px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 14, cursor: "pointer", width: "100%" }}>Close</button>
       </div>
     </div>
   );

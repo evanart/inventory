@@ -24,7 +24,7 @@ export default function MoveItemModal({ item, tree, onMove, onCancel }) {
             <button key={loc.id} onClick={() => { if (loc.id !== currentParentId) onMove(loc.id); }}
               disabled={loc.id === currentParentId}
               style={{
-                display: "flex", alignItems: "center", gap: 6, width: "100%", textAlign: "left", padding: "8px 12px",
+                display: "flex", alignItems: "center", gap: 6, width: "100%", textAlign: "left", padding: "10px 12px",
                 paddingLeft: 12 + (loc.depth - 1) * 16, border: "none", borderBottom: "1px solid #f5f5f5",
                 background: loc.id === currentParentId ? "#e8f7fa" : "#fff", cursor: loc.id === currentParentId ? "default" : "pointer",
                 fontSize: 13, color: loc.id === currentParentId ? "#0e7490" : "#222",
@@ -34,7 +34,7 @@ export default function MoveItemModal({ item, tree, onMove, onCancel }) {
             </button>
           ))}
         </div>
-        <button onClick={onCancel} style={{ marginTop: 12, padding: "9px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer", width: "100%" }}>Cancel</button>
+        <button onClick={onCancel} style={{ marginTop: 12, padding: "11px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#666", fontWeight: 600, fontSize: 14, cursor: "pointer", width: "100%" }}>Cancel</button>
       </div>
     </div>
   );
