@@ -15,6 +15,12 @@ input, textarea, select, button {
   font-family: inherit;
 }
 
+@supports (-webkit-touch-callout: none) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
 button {
   transition: opacity 0.15s, background-color 0.15s, color 0.15s;
 }
