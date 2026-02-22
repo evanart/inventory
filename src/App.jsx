@@ -1461,7 +1461,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 600, margin: "0 auto", padding: "14px 0" }}>
+      <div style={{ maxWidth: 600, margin: "0 auto", padding: "14px 12px" }}>
         {nlpAvailable && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
