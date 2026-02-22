@@ -26,7 +26,7 @@ function checkRateLimit(key, max) {
 const PARSE_SCHEMA = {
   type: "object",
   properties: {
-    action: { type: "string", enum: ["store", "remove"] },
+    action: { type: "string", enum: ["store", "remove", "search"] },
     items: {
       type: "array",
       items: {
@@ -59,8 +59,9 @@ const PARSE_SCHEMA = {
         required: ["name", "type", "parentPath"],
       },
     },
+    searchResult: { type: "string" },
   },
-  required: ["action", "items"],
+  required: ["action"],
 };
 
 export default {
