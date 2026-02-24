@@ -11,6 +11,7 @@ import { exportTreeToCSV, importCSVToTree } from "./utils/csv.js";
 import { processWithAI } from "./services/api.js";
 import { loadDataLocal, loadDataFromServer, saveTimeout, debouncedSave, flushSave } from "./services/storage.js";
 import { useSpeech } from "./hooks/useSpeech.js";
+import { useHistoryNav } from "./hooks/useHistoryNav.js";
 
 import EditItemModal from "./components/modals/EditItemModal.jsx";
 import MoveItemModal from "./components/modals/MoveItemModal.jsx";
@@ -46,6 +47,7 @@ export default function App() {
   const [historyNode, setHistoryNode] = useState(null);
   const [showDeletedLog, setShowDeletedLog] = useState(false);
   const speech = useSpeech();
+  const { navigateTo, resetTo } = useHistoryNav(currentId, setCurrentId);
 
   const fileInputRef = useRef(null);
   const treeRef = useRef(tree);
@@ -345,7 +347,7 @@ export default function App() {
         setUndoStack(prev => [...prev.slice(-9), { tree, label: "import" }]);
         setTree(newTree);
         flushSave(newTree);
-        setCurrentId("house");
+        resetTo("house");
         let msg = "Imported " + count + " items from CSV.";
         if (errors.length > 0) msg += " (" + errors.length + " row(s) skipped)";
         setMessage({ type: "success", text: msg });
@@ -365,7 +367,7 @@ export default function App() {
         setUndoStack(prev => [...prev.slice(-9), { tree, label: "load sample data" }]);
         setTree(newTree);
         flushSave(newTree);
-        setCurrentId("house");
+        resetTo("house");
         setMessage({ type: "success", text: "Loaded sample data \u2014 " + count + " items across your house." });
       })
       .catch(err => { setMessage({ type: "error", text: "Failed to load sample data: " + err.message }); });
@@ -375,7 +377,7 @@ export default function App() {
     setUndoStack(prev => [...prev.slice(-9), { tree, label: "clear all" }]);
     setTree(emptyTree);
     flushSave(emptyTree);
-    setCurrentId("house");
+    resetTo("house");
     setShowDataMenu(false);
     setMessage({ type: "info", text: "All items and containers cleared. House structure preserved." });
   };
@@ -444,7 +446,7 @@ export default function App() {
           canRename={canRename}
           adding={adding}
           addingItem={addingItem}
-          onNavigate={setCurrentId}
+          onNavigate={navigateTo}
           onRename={handleRenameLocation}
           onDelete={handleDelete}
           onMoveLocation={setMovingLocation}
